@@ -216,4 +216,4 @@ At the time of this writing, the build only works on Mac, because of the way it 
 
 ### Editing
 
-Please run ./configure before your first commit to install a pre-commit hook that formats the code.
+Please run ./configure before your first commit to install a pre-commit hook that formats the code.# Java Language Server for AndroidIDE
