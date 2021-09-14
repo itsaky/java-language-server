@@ -46,7 +46,6 @@ import org.javacs.lsp.CompletionItem;
 import org.javacs.lsp.CompletionItemKind;
 import org.javacs.lsp.CompletionList;
 import org.javacs.lsp.InsertTextFormat;
-import org.javacs.lsp.PartialIdentifier;
 import org.javacs.lsp.TextEdit;
 import org.javacs.rewrite.AddImport;
 
