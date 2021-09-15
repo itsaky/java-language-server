@@ -145,6 +145,11 @@ class JavaLanguageServer extends LanguageServer {
     }
 
     @Override
+    public void buildModified() {
+        modifiedBuild = true;
+    }
+
+    @Override
     public InitializeResult initialize(InitializeParams params) {
         this.workspaceRoot = Paths.get(params.rootUri);
         final Set<Path> roots = new HashSet<>();

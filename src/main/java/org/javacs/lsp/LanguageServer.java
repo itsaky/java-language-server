@@ -48,6 +48,10 @@ public class LanguageServer {
         throw new RuntimeException("Unimplemented");
     }
 
+    public void buildModified() {
+        throw new RuntimeException("Unimplemented");
+    }
+
     public Optional<CompletionList> completion(TextDocumentPositionParams params) {
         throw new RuntimeException("Unimplemented");
     }

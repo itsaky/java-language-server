@@ -294,6 +294,10 @@ public class LSP {
                             LOG.warning("Got exit message, exiting...");
                             break processMessages;
                         }
+                    case "project/buildModified":
+                        {
+                            server.buildModified();
+                        }
                     case "workspace/didChangeWorkspaceFolders":
                         {
                             var params = gson.fromJson(r.params, DidChangeWorkspaceFoldersParams.class);
