@@ -2,6 +2,11 @@ package org.javacs.action;
 
 class TestCreateMissingMethod {
     void test() {
-        foo(1, "two");
+        var i = foo(1, "two");
+        
+    }
+    
+    private static class Test {
+    	static int member;
     }
 }

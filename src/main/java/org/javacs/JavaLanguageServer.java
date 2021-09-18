@@ -62,7 +62,7 @@ class JavaLanguageServer extends LanguageServer {
         try (var task = compiler().compile(files.toArray(Path[]::new))) {
             var compiled = Instant.now();
             LOG.info("...compiled in " + Duration.between(started, compiled).toMillis() + " ms");
-            for (var errs : new ErrorProvider(task).errors()) {
+            for (var errs : new ErrorProvider(compiler(), task).errors()) {
                 client.publishDiagnostics(errs);
             }
             for (var colors : new ColorProvider(task).colors()) {

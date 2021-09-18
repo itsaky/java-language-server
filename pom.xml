@@ -122,6 +122,13 @@
                 <configuration>
                 <outputDirectory>${project.basedir}/dist/classpath</outputDirectory>
                 <finalName>java-language-server</finalName>
+                	<archive>
+                		<manifest>
+                			<mainClass>
+                				org.javacs.Main
+                			</mainClass>
+                		</manifest>
+                	</archive>
                 </configuration>
             </plugin>
         </plugins>

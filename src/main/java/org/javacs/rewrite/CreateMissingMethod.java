@@ -13,6 +13,8 @@ import com.sun.source.util.Trees;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.StringJoiner;
+import java.util.logging.Logger;
+
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
 import org.javacs.CompileTask;
@@ -33,10 +35,16 @@ public class CreateMissingMethod implements Rewrite {
     public Map<Path, TextEdit[]> rewrite(CompilerProvider compiler) {
         try (var task = compiler.compile(file)) {
             var trees = Trees.instance(task.task);
-            var call = new FindMethodCallAt(task.task).scan(task.root(), position);
+            var methodFinder = new FindMethodCallAt(task.task);
+            var call = methodFinder.scan(task.root(), position);
             if (call == null) return CANCELLED;
             var path = trees.getPath(task.root(), call);
-            var insertText = "\n" + printMethodHeader(task, call) + " {\n    // TODO\n}";
+            var returnType = methodFinder.getAssigningType();
+            var insertText = "\n";
+            insertText += printMethodHeader(task, call, returnType)  + " {\n" +
+            			  "    // TODO: Implement this method\n"     +
+            			  "    " + createReturnStatement(returnType) + "\n" +
+            			  "}";
             var surroundingClass = surroundingClass(path);
             var indent = EditHelper.indent(task.task, task.root(), surroundingClass) + 4;
             insertText = insertText.replaceAll("\n", "\n" + " ".repeat(indent));
@@ -47,7 +55,42 @@ public class CreateMissingMethod implements Rewrite {
         }
     }
 
-    private ClassTree surroundingClass(TreePath call) {
+    private String createReturnStatement(String returnType) {
+    	if(returnType == null) return "";
+    	String value = "null";
+    	 switch (returnType) {
+    		case "int" :
+    		case "byte" :
+    		case "short" :
+    		case "long" :
+    		case "char" :
+    			value = "0";
+    			break;
+    		case "float" :
+    			value = "0f";
+    			break;
+    		case "double" :
+    			value = "0.0";
+    			break;
+    		case "boolean" :
+    			value = "false";
+    			break;
+    		
+    		/**
+    		 * Finding type of variable declaration may result in an error
+    		 * We should then simply return empty return type
+    		 */
+    		case "(ERROR)" :
+    			return ""; // Directly return empty string
+    		default :
+    			value = "null";
+    			break;
+    			
+    	}
+		return String.format("return %s;", value);
+	}
+
+	private ClassTree surroundingClass(TreePath call) {
         while (call != null) {
             if (call.getLeaf() instanceof ClassTree) {
                 return (ClassTree) call.getLeaf();
@@ -67,9 +110,10 @@ public class CreateMissingMethod implements Rewrite {
         throw new RuntimeException("No surrounding class");
     }
 
-    private String printMethodHeader(CompileTask task, MethodInvocationTree call) {
+    private String printMethodHeader(CompileTask task, MethodInvocationTree call, String type) {
         var methodName = extractMethodName(call.getMethodSelect());
-        var returnType = "void"; // TODO infer type
+        var returnType = type == null || "(ERROR)".equals(type) ? "void" : type;
+        LOG.info("Creating missing method with return type: " + returnType);
         if (returnType.equals(methodName)) {
             returnType = "_";
         }
@@ -137,4 +181,6 @@ public class CreateMissingMethod implements Rewrite {
             return "";
         }
     }
+    
+    private static final Logger LOG = Logger.getLogger("main");
 }

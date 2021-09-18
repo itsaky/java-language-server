@@ -44,7 +44,7 @@ public class CodeActionProvider {
         var actions = new ArrayList<CodeAction>();
         for (var title : rewrites.keySet()) {
             // TODO are these all quick fixes?
-            actions.addAll(createQuickFix(title, rewrites.get(title)));
+            actions.addAll(createQuickFix(title, rewrites.get(title), null));
         }
         var elapsed = Duration.between(started, Instant.now()).toMillis();
         LOG.info(String.format("...created %d actions in %d ms", actions.size(), elapsed));
@@ -124,19 +124,19 @@ public class CodeActionProvider {
         switch (d.code) {
             case "unused_local":
                 var toStatement = new ConvertVariableToStatement(file, findPosition(task, d.range.start));
-                return createQuickFix("Convert to statement", toStatement);
+                return createQuickFix("Convert to statement", toStatement, d);
             case "unused_field":
                 var toBlock = new ConvertFieldToBlock(file, findPosition(task, d.range.start));
-                return createQuickFix("Convert to block", toBlock);
+                return createQuickFix("Convert to block", toBlock, d);
             case "unused_class":
                 var removeClass = new RemoveClass(file, findPosition(task, d.range.start));
-                return createQuickFix("Remove class", removeClass);
+                return createQuickFix("Remove class", removeClass, d);
             case "unused_method":
                 var unusedMethod = findMethod(task, d.range);
                 var removeMethod =
                         new RemoveMethod(
                                 unusedMethod.className, unusedMethod.methodName, unusedMethod.erasedParameterTypes);
-                return createQuickFix("Remove method", removeMethod);
+                return createQuickFix("Remove method", removeMethod, d);
             case "unused_throws":
                 var shortExceptionName = extractRange(task, d.range);
                 var notThrown = extractNotThrownExceptionName(d.message);
@@ -147,13 +147,13 @@ public class CodeActionProvider {
                                 methodWithExtraThrow.methodName,
                                 methodWithExtraThrow.erasedParameterTypes,
                                 notThrown);
-                return createQuickFix("Remove '" + shortExceptionName + "'", removeThrow);
+                return createQuickFix("Remove '" + shortExceptionName + "'", removeThrow, d);
             case "compiler.warn.unchecked.call.mbr.of.raw.type":
                 var warnedMethod = findMethod(task, d.range);
                 var suppressWarning =
                         new AddSuppressWarningAnnotation(
                                 warnedMethod.className, warnedMethod.methodName, warnedMethod.erasedParameterTypes);
-                return createQuickFix("Suppress 'unchecked' warning", suppressWarning);
+                return createQuickFix("Suppress 'unchecked' warning", suppressWarning, d);
             case "compiler.err.unreported.exception.need.to.catch.or.throw":
                 var needsThrow = findMethod(task, d.range);
                 var exceptionName = extractExceptionName(d.message);
@@ -163,7 +163,7 @@ public class CodeActionProvider {
                                 needsThrow.methodName,
                                 needsThrow.erasedParameterTypes,
                                 exceptionName);
-                return createQuickFix("Add 'throws'", addThrows);
+                return createQuickFix("Add 'throws'", addThrows, d);
             case "compiler.err.cant.resolve.location":
                 var simpleName = extractRange(task, d.range);
                 var allImports = new ArrayList<CodeAction>();
@@ -171,7 +171,7 @@ public class CodeActionProvider {
                     if (qualifiedName.endsWith("." + simpleName)) {
                         var title = "Import '" + qualifiedName + "'";
                         var addImport = new AddImport(file, qualifiedName);
-                        allImports.addAll(createQuickFix(title, addImport));
+                        allImports.addAll(createQuickFix(title, addImport, d));
                     }
                 }
                 return allImports;
@@ -179,14 +179,14 @@ public class CodeActionProvider {
                 var needsConstructor = findClassNeedingConstructor(task, d.range);
                 if (needsConstructor == null) return List.of();
                 var generateConstructor = new GenerateRecordConstructor(needsConstructor);
-                return createQuickFix("Generate constructor", generateConstructor);
+                return createQuickFix("Generate constructor", generateConstructor, d);
             case "compiler.err.does.not.override.abstract":
                 var missingAbstracts = findClass(task, d.range);
                 var implementAbstracts = new ImplementAbstractMethods(missingAbstracts);
-                return createQuickFix("Implement abstract methods", implementAbstracts);
+                return createQuickFix("Implement abstract methods", implementAbstracts, d);
             case "compiler.err.cant.resolve.location.args":
                 var missingMethod = new CreateMissingMethod(file, findPosition(task, d.range.start));
-                return createQuickFix("Create missing method", missingMethod);
+                return createQuickFix("Create missing method", missingMethod, d);
             default:
                 return List.of();
         }
@@ -303,7 +303,7 @@ public class CodeActionProvider {
         return contents.subSequence(start, end);
     }
 
-    private List<CodeAction> createQuickFix(String title, Rewrite rewrite) {
+    private List<CodeAction> createQuickFix(String title, Rewrite rewrite, org.javacs.lsp.Diagnostic d) {
         var edits = rewrite.rewrite(compiler);
         if (edits == Rewrite.CANCELLED) {
             return List.of();
@@ -311,6 +311,8 @@ public class CodeActionProvider {
         var a = new CodeAction();
         a.kind = CodeActionKind.QuickFix;
         a.title = title;
+        if(d != null)
+            a.diagnosticMessage = d.message;
         a.edit = new WorkspaceEdit();
         for (var file : edits.keySet()) {
             a.edit.changes.put(file.toUri(), List.of(edits.get(file)));
