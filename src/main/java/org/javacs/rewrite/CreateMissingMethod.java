@@ -151,8 +151,8 @@ public class CreateMissingMethod implements Rewrite {
         for (var i = 0; i < call.getArguments().size(); i++) {
             var type = trees.getTypeMirror(trees.getPath(task.root(), call.getArguments().get(i)));
             var name = guessParameterName(call.getArguments().get(i), type);
-            var printType = EditHelper.printType(type);
-            join.add(printType + " " + name);
+            var argType = EditHelper.printType(type);
+            join.add(String.format("final %s %s", argType, name));
         }
         return join.toString();
     }
