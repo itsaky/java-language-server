@@ -27,6 +27,8 @@ import org.javacs.lsp.TextEdit;
 public class CreateMissingMethod implements Rewrite {
     final Path file;
     final int position;
+    
+    int argCount = -1;
 
     public CreateMissingMethod(Path file, int position) {
         this.file = file;
@@ -165,7 +167,7 @@ public class CreateMissingMethod implements Rewrite {
             var select = (MemberSelectTree) method;
             return select.getIdentifier().toString();
         } else {
-            return "_";
+            return "giveMeAProperName";
         }
     }
 
@@ -178,7 +180,9 @@ public class CreateMissingMethod implements Rewrite {
         if (!fromType.isEmpty()) {
             return fromType;
         }
-        return "_";
+        
+        argCount++;
+        return "iWantAName" + argCount;
     }
 
     private String guessParameterNameFromTree(Tree argument) {
