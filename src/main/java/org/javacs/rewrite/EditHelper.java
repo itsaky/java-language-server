@@ -26,7 +26,7 @@ class EditHelper {
         this.task = task;
     }
 
-    TextEdit removeTree(CompilationUnitTree root, Tree remove) {
+    TextEdit removeTree(final CompilationUnitTree root, final Tree remove) {
         var pos = Trees.instance(task).getSourcePositions();
         var lines = root.getLineMap();
         var start = pos.getStartPosition(root, remove);
@@ -41,7 +41,7 @@ class EditHelper {
         return new TextEdit(range, "");
     }
 
-    static String printMethod(ExecutableElement method, ExecutableType parameterizedType, MethodTree source) {
+    static String printMethod(final ExecutableElement method, final ExecutableType parameterizedType, MethodTree source) {
         var buf = new StringBuilder();
         // TODO leading \n is extra, but needed for indent replaceAll trick
         buf.append("\n@Override\n");
@@ -58,7 +58,7 @@ class EditHelper {
         return buf.toString();
     }
 
-    private static String printParameters(ExecutableType method, MethodTree source) {
+    private static String printParameters(final ExecutableType method, final MethodTree source) {
         var join = new StringJoiner(", ");
         for (var i = 0; i < method.getParameterTypes().size(); i++) {
             var type = EditHelper.printType(method.getParameterTypes().get(i));
@@ -68,7 +68,7 @@ class EditHelper {
         return join.toString();
     }
 
-    static String printType(TypeMirror type) {
+    static String printType(final TypeMirror type) {
         if (type instanceof DeclaredType) {
             var declared = (DeclaredType) type;
             var string = printTypeName((TypeElement) declared.asElement());
@@ -84,7 +84,7 @@ class EditHelper {
         }
     }
 
-    private static String printTypeParameters(List<? extends TypeMirror> arguments) {
+    private static String printTypeParameters(final List<? extends TypeMirror> arguments) {
         var join = new StringJoiner(", ");
         for (var a : arguments) {
             join.add(printType(a));
@@ -92,14 +92,14 @@ class EditHelper {
         return join.toString();
     }
 
-    static String printTypeName(TypeElement type) {
+    static String printTypeName(final TypeElement type) {
         if (type.getEnclosingElement() instanceof TypeElement) {
             return printTypeName((TypeElement) type.getEnclosingElement()) + "." + type.getSimpleName();
         }
         return type.getSimpleName().toString();
     }
 
-    static int indent(JavacTask task, CompilationUnitTree root, ClassTree leaf) {
+    static int indent(final JavacTask task, final CompilationUnitTree root, final ClassTree leaf) {
         var pos = Trees.instance(task).getSourcePositions();
         var lines = root.getLineMap();
         var startClass = pos.getStartPosition(root, leaf);
@@ -107,7 +107,7 @@ class EditHelper {
         return (int) (startClass - startLine);
     }
 
-    static Position insertBefore(JavacTask task, CompilationUnitTree root, Tree member) {
+    static Position insertBefore(final JavacTask task, final CompilationUnitTree root, final Tree member) {
         var pos = Trees.instance(task).getSourcePositions();
         var lines = root.getLineMap();
         var start = pos.getStartPosition(root, member);
@@ -115,7 +115,7 @@ class EditHelper {
         return new Position(line - 1, 0);
     }
 
-    static Position insertAfter(JavacTask task, CompilationUnitTree root, Tree member) {
+    static Position insertAfter(final JavacTask task, final CompilationUnitTree root, final Tree member) {
         var pos = Trees.instance(task).getSourcePositions();
         var lines = root.getLineMap();
         var end = pos.getEndPosition(root, member);

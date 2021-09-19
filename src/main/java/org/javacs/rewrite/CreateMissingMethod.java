@@ -10,6 +10,8 @@ import com.sun.source.tree.MethodTree;
 import com.sun.source.tree.Tree;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.Trees;
+
+import javax.lang.model.element.Modifier;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.StringJoiner;
@@ -34,24 +36,43 @@ public class CreateMissingMethod implements Rewrite {
     @Override
     public Map<Path, TextEdit[]> rewrite(CompilerProvider compiler) {
         try (var task = compiler.compile(file)) {
-            var trees = Trees.instance(task.task);
-            var methodFinder = new FindMethodCallAt(task.task);
-            var call = methodFinder.scan(task.root(), position);
+            final var trees = Trees.instance(task.task);
+            final var methodFinder = new FindMethodCallAt(task.task);
+            final var call = methodFinder.scan(task.root(), position);
             if (call == null) return CANCELLED;
-            var path = trees.getPath(task.root(), call);
-            var returnType = methodFinder.getAssigningType();
+            final var path = trees.getPath(task.root(), call);
+            final var returnType = methodFinder.getReturnType();
+            var sourceFile = file;
+            var currentMethod = surroundingMethod(path);
             var insertText = "\n";
-            insertText += printMethodHeader(task, call, returnType)  + " {\n" +
+            
+            insertText += printMethodHeader(task, call, returnType, methodFinder.isMemberSelect(), currentMethod.getModifiers().getFlags().contains(Modifier.STATIC))  + " {\n" +
             			  "    // TODO: Implement this method\n"     +
             			  "    " + createReturnStatement(returnType) + "\n" +
             			  "}";
-            var surroundingClass = surroundingClass(path);
-            var indent = EditHelper.indent(task.task, task.root(), surroundingClass) + 4;
-            insertText = insertText.replaceAll("\n", "\n" + " ".repeat(indent));
-            insertText = insertText + "\n";
-            var insertPoint = EditHelper.insertAfter(task.task, task.root(), surroundingMethod(path));
-            TextEdit[] edits = {new TextEdit(new Range(insertPoint, insertPoint), insertText)};
-            return Map.of(file, edits);
+            
+            TextEdit[] edits = null;			  
+            if(methodFinder.isMemberSelect()) {
+            	// Accessing method from another class
+            	final var compilationUnit = methodFinder.getEnclosingTreePath().getCompilationUnit();
+            	final var enclosingClass = methodFinder.getEnclosingClass();
+            	final var indent = EditHelper.indent(task.task, compilationUnit, enclosingClass) + 4;
+            	insertText = insertText.replaceAll("\n", "\n" + " ".repeat(indent));
+            	insertText = insertText + "\n";
+            	final var insertPoint = EditHelper.insertAtEndOfClass(task.task, compilationUnit, enclosingClass);
+            	edits = new TextEdit[]{new TextEdit(new Range(insertPoint, insertPoint), insertText)};
+            	sourceFile = Path.of(compilationUnit.getSourceFile().toUri());
+            } else {
+            	var surroundingClass = surroundingClass(path);
+            	var indent = EditHelper.indent(task.task, task.root(), surroundingClass) + 4;
+            	insertText = insertText.replaceAll("\n", "\n" + " ".repeat(indent));
+            	insertText = insertText + "\n";
+            	var insertPoint = EditHelper.insertAfter(task.task, task.root(), surroundingMethod(path));
+            	edits = new TextEdit[]{new TextEdit(new Range(insertPoint, insertPoint), insertText)};
+            }
+            if(file != null && edits != null)
+            	return Map.of(sourceFile, edits);
+            else return null;
         }
     }
 
@@ -107,10 +128,10 @@ public class CreateMissingMethod implements Rewrite {
             }
             call = call.getParentPath();
         }
-        throw new RuntimeException("No surrounding class");
+        throw new RuntimeException("No surrounding method");
     }
 
-    private String printMethodHeader(CompileTask task, MethodInvocationTree call, String type) {
+    private String printMethodHeader(CompileTask task, MethodInvocationTree call, String type, boolean isMemeberSelect, boolean isStatic) {
         var methodName = extractMethodName(call.getMethodSelect());
         var returnType = type == null || "(ERROR)".equals(type) ? "void" : type;
         LOG.info("Creating missing method with return type: " + returnType);
@@ -118,7 +139,10 @@ public class CreateMissingMethod implements Rewrite {
             returnType = "_";
         }
         var parameters = printParameters(task, call);
-        return "private " + returnType + " " + methodName + "(" + parameters + ")";
+        var modifiers = isMemeberSelect ? "public" : "private";
+        if(isStatic)
+        	modifiers += " static";
+        return modifiers + " " + returnType + " " + methodName + "(" + parameters + ")";
     }
 
     private String printParameters(CompileTask task, MethodInvocationTree call) {

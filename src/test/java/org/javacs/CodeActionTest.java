@@ -120,8 +120,7 @@ public class CodeActionTest {
     }
 
     private List<String> extractTitles(List<CodeAction> actions) {
-        
-        System.out.println("fixes:\n" + new Gson().toJson(actions));
+        System.out.println(new Gson().toJson(actions));
         var quickFix = new ArrayList<String>();
         for (var a : actions) {
             quickFix.add(a.title);

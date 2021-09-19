@@ -2,11 +2,9 @@ package org.javacs.action;
 
 class TestCreateMissingMethod {
     void test() {
-        var i = foo(1, "two");
-        
+        TestAddImport addImport;
+        addImport.tester.test.foo();
     }
     
-    private static class Test {
-    	static int member;
-    }
+    TestCreateMissingMethod get() { return this; }
 }
