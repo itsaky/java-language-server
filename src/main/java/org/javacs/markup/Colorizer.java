@@ -6,6 +6,7 @@ import java.nio.file.Paths;
 import javax.lang.model.element.*;
 import org.javacs.FileStore;
 import org.javacs.lsp.Range;
+
 import static javax.lang.model.element.ElementKind.*;
 
 class Colorizer extends TreePathScanner<Void, SemanticColors> {
@@ -13,6 +14,14 @@ class Colorizer extends TreePathScanner<Void, SemanticColors> {
 
     Colorizer(JavacTask task) {
         trees = Trees.instance(task);
+    }
+    
+    private void packageDeclaration (CompilationUnitTree unit, Tree tree, SemanticColors colors) {
+    	var pos = trees.getSourcePositions();
+    	var start = pos.getStartPosition(unit, tree);
+    	var end = pos.getEndPosition(unit, tree);
+    	var range = RangeHelper.range(unit, start, end);
+    	colors.packages.add(range);
     }
 
     private void maybeField(Name name, SemanticColors colors) {
@@ -142,6 +151,13 @@ class Colorizer extends TreePathScanner<Void, SemanticColors> {
         start += region.indexOf(name.toString());
         end = start + name.length();
         return RangeHelper.range(root, start, end);
+    }
+    
+    @Override
+    public Void visitCompilationUnit(CompilationUnitTree tree, SemanticColors colors) {
+    	var pkg = tree.getPackage().getPackageName();
+    	packageDeclaration(tree, pkg, colors);
+    	return super.visitCompilationUnit(tree, colors);
     }
 
     @Override

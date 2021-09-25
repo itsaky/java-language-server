@@ -1,8 +1,10 @@
 package org.javacs;
 
 import java.util.*;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
 import org.javacs.lsp.*;
 import org.junit.Assert;
 

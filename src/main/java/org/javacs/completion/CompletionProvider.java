@@ -10,6 +10,7 @@ import com.sun.source.tree.SwitchTree;
 import com.sun.source.tree.Tree;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.Trees;
+
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
@@ -33,6 +34,7 @@ import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeVariable;
+
 import org.javacs.CompileTask;
 import org.javacs.CompilerProvider;
 import org.javacs.CompletionData;
@@ -51,7 +53,7 @@ import org.javacs.rewrite.AddImport;
 
 public class CompletionProvider {
     private final CompilerProvider compiler;
-
+    
     public static final CompletionList NOT_SUPPORTED = new CompletionList(false, List.of());
     public static final int MAX_COMPLETION_ITEMS = 50;
 
@@ -174,7 +176,7 @@ public class CompletionProvider {
         }
     }
 
-    private void addTopLevelSnippets(ParseTask task, CompletionList list) {
+	private void addTopLevelSnippets(ParseTask task, CompletionList list) {
         var file = Paths.get(task.root.getSourceFile().toUri());
         if (!hasTypeDeclaration(task.root)) {
             list.items.add(classSnippet(file));
@@ -246,14 +248,14 @@ public class CompletionProvider {
     }
 
     private void addKeywords(TreePath path, String partial, CompletionList list) {
-        var level = findKeywordLevel(path);
+        var level = findTreeLevel(path);
         String[] keywords = {};
         if (level instanceof CompilationUnitTree) {
-            keywords = TOP_LEVEL_KEYWORDS;
+        	keywords = TOP_LEVEL_KEYWORDS;
         } else if (level instanceof ClassTree) {
-            keywords = CLASS_BODY_KEYWORDS;
+        	keywords = CLASS_BODY_KEYWORDS;
         } else if (level instanceof MethodTree) {
-            keywords = METHOD_BODY_KEYWORDS;
+        	keywords = METHOD_BODY_KEYWORDS;
         }
         for (var k : keywords) {
             if (StringSearch.matchesPartialName(k, partial)) {
@@ -262,7 +264,7 @@ public class CompletionProvider {
         }
     }
 
-    private Tree findKeywordLevel(TreePath path) {
+    private Tree findTreeLevel(TreePath path) {
         while (path != null) {
             if (path.getLeaf() instanceof CompilationUnitTree
                     || path.getLeaf() instanceof ClassTree
@@ -506,6 +508,7 @@ public class CompletionProvider {
             if (!trees.isAccessible(scope, member, type)) continue;
             if (!isStatic && member.getModifiers().contains(Modifier.STATIC)) continue;
             if (member.getKind() == ElementKind.METHOD) {
+                
                 putMethod((ExecutableElement) member, methods);
             } else {
                 list.add(item(task, member));
@@ -632,23 +635,24 @@ public class CompletionProvider {
         i.detail = first.getReturnType() + " " + first;
         var data = data(task, first, overloads.size());
         i.data = JsonHelper.GSON.toJsonTree(data);
+        
         if (addParens) {
             if (overloads.size() == 1 && first.getParameters().isEmpty()) {
-                i.insertText = first.getSimpleName() + "()$0";
-            } else {
-                i.insertText = first.getSimpleName() + "($0)";
-                // Activate signatureHelp
-                // Remove this if VSCode ever fixes https://github.com/microsoft/vscode/issues/78806
-                i.command = new Command();
-                i.command.command = "editor.action.triggerParameterHints";
-                i.command.title = "Trigger Parameter Hints";
-            }
+                	i.insertText = first.getSimpleName() + "()$0";
+            	} else {
+                	i.insertText = first.getSimpleName() + "($0)";
+                	// Activate signatureHelp
+                	// Remove this if VSCode ever fixes https://github.com/microsoft/vscode/issues/78806
+                	i.command = new Command();
+                	i.command.command = "editor.action.triggerParameterHints";
+                	i.command.title = "Trigger Parameter Hints";
+            	}
             i.insertTextFormat = 2; // Snippet
         }
         return i;
     }
 
-    private CompletionData data(CompileTask task, Element element, int overloads) {
+	private CompletionData data(CompileTask task, Element element, int overloads) {
         var data = new CompletionData();
         if (element instanceof TypeElement) {
             var type = (TypeElement) element;

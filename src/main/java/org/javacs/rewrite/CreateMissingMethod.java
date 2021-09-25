@@ -48,7 +48,7 @@ public class CreateMissingMethod implements Rewrite {
             var currentMethod = surroundingMethod(path);
             var insertText = "\n";
             
-            insertText += printMethodHeader(task, call, returnType, methodFinder.isMemberSelect(), currentMethod.getModifiers().getFlags().contains(Modifier.STATIC))  + " {\n" +
+            insertText += printMethodHeader(task, call, returnType, methodFinder.isMemberSelect(), (currentMethod.getModifiers().getFlags().contains(Modifier.STATIC) || methodFinder.isStaticAccess()))  + " {\n" +
             			  "    // TODO: Implement this method\n"     +
             			  "    " + createReturnStatement(returnType) + "\n" +
             			  "}";

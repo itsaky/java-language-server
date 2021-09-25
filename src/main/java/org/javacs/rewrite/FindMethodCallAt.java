@@ -21,6 +21,7 @@ class FindMethodCallAt extends TreePathScanner<MethodInvocationTree, Integer> {
     private CompilationUnitTree root;
     
     private boolean isMemberSelect;
+    private boolean isStatic;
     
     private String returnType;
     private ClassTree enclosingTree;
@@ -55,6 +56,10 @@ class FindMethodCallAt extends TreePathScanner<MethodInvocationTree, Integer> {
     
     public boolean isMemberSelect() {
     	return isMemberSelect;
+    }
+    
+    public boolean isStaticAccess() {
+    	return isStatic;
     }
 
     @Override
@@ -153,6 +158,9 @@ class FindMethodCallAt extends TreePathScanner<MethodInvocationTree, Integer> {
     		if(start <= find && find <= end) {
     			var element = trees.getElement(trees.getPath(root, tree));
     			
+    			// Is this a static access?
+    			isStatic = element instanceof TypeElement;
+    			
     			// Find enclosing element to get the TypeElement from which this method is being called
     			this.enclosingElement = enclosingType(element);
     			
@@ -170,6 +178,8 @@ class FindMethodCallAt extends TreePathScanner<MethodInvocationTree, Integer> {
     							&& declaredInTopLevel != null
     							&& enclosingTreePath != null
     							&& enclosingTree != null;
+    							
+    			LOG.info(String.format("checkForQualifiedName\nisStatic: %s\nenclosingElement: %s\ndeclaredInTopLevel: %s\nenclosingTreePath: %s\nenclosingTree: %s\nisMemberSelect: %s", "" + isStatic, "" + enclosingElement, "" + declaredInTopLevel, "" + enclosingTreePath, "" + enclosingTree, "" + isMemberSelect));
     		}
     	}
     }

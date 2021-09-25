@@ -2,7 +2,6 @@ package org.javacs.markup;
 
 import com.sun.source.tree.*;
 import com.sun.source.util.*;
-import java.net.URI;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -13,7 +12,6 @@ import javax.tools.JavaFileObject;
 import org.javacs.CompileTask;
 import org.javacs.CompilerProvider;
 import org.javacs.FileStore;
-import org.javacs.action.CodeActionProvider;
 import org.javacs.lsp.*;
 
 public class ErrorProvider {
@@ -26,6 +24,7 @@ public class ErrorProvider {
     }
 
     public PublishDiagnosticsParams[] errors() {
+        if(!isTaskValid(task)) return new PublishDiagnosticsParams[0];
         var result = new PublishDiagnosticsParams[task.roots.size()];
         for (var i = 0; i < task.roots.size(); i++) {
             var root = task.roots.get(i);
@@ -37,17 +36,20 @@ public class ErrorProvider {
             result[i].diagnostics.addAll(notThrownWarnings(root));
         }
         // TODO hint fields that could be final
-
+        
         return result;
     }
 
-    private List<org.javacs.lsp.Diagnostic> compilerErrors(CompilationUnitTree root) {
+    private boolean isTaskValid(CompileTask task) {
+		return task != null && task.task != null && task.roots != null;
+	}
+
+	private List<org.javacs.lsp.Diagnostic> compilerErrors(CompilationUnitTree root) {
         var result = new ArrayList<org.javacs.lsp.Diagnostic>();
-        var uri = root.getSourceFile().toUri();
         for (var d : task.diagnostics) {
             if (d.getSource() == null || !d.getSource().toUri().equals(root.getSourceFile().toUri())) continue;
             if (d.getStartPosition() == -1 || d.getEndPosition() == -1) continue;
-            result.add(lspDiagnostic(d, root.getLineMap(), uri));
+            result.add(lspDiagnostic(d, root.getLineMap()));
         }
         return result;
     }
@@ -55,10 +57,9 @@ public class ErrorProvider {
     private List<org.javacs.lsp.Diagnostic> unusedWarnings(CompilationUnitTree root) {
         var result = new ArrayList<org.javacs.lsp.Diagnostic>();
         var warnUnused = new WarnUnused(task.task);
-        var uri = root.getSourceFile().toUri();
         warnUnused.scan(root, null);
         for (var unusedEl : warnUnused.notUsed()) {
-            result.add(warnUnused(unusedEl, uri));
+            result.add(warnUnused(unusedEl));
         }
         return result;
     }
@@ -66,10 +67,9 @@ public class ErrorProvider {
     private List<org.javacs.lsp.Diagnostic> notThrownWarnings(CompilationUnitTree root) {
         var result = new ArrayList<org.javacs.lsp.Diagnostic>();
         var notThrown = new HashMap<TreePath, String>();
-        var uri = root.getSourceFile().toUri();
         new WarnNotThrown(task.task).scan(root, notThrown);
         for (var location : notThrown.keySet()) {
-            result.add(warnNotThrown(notThrown.get(location), location, uri));
+            result.add(warnNotThrown(notThrown.get(location), location));
         }
         return result;
     }
@@ -78,7 +78,7 @@ public class ErrorProvider {
      * lspDiagnostic(d, lines) converts d to LSP format, with its position shifted appropriately for the latest version
      * of the file.
      */
-    private org.javacs.lsp.Diagnostic lspDiagnostic(javax.tools.Diagnostic<? extends JavaFileObject> d, LineMap lines, URI uri) {
+    private org.javacs.lsp.Diagnostic lspDiagnostic(javax.tools.Diagnostic<? extends JavaFileObject> d, LineMap lines) {
         var start = d.getStartPosition();
         var end = d.getEndPosition();
         var startLine = (int) lines.getLineNumber(start);
@@ -94,7 +94,6 @@ public class ErrorProvider {
         result.message = message;
         result.range =
                 new Range(new Position(startLine - 1, startColumn - 1), new Position(endLine - 1, endColumn - 1));
-        result.codeActions = codeActions(result, uri);
         return result;
     }
 
@@ -113,7 +112,7 @@ public class ErrorProvider {
         }
     }
 
-    private org.javacs.lsp.Diagnostic warnNotThrown(String name, TreePath path, URI uri) {
+    private org.javacs.lsp.Diagnostic warnNotThrown(String name, TreePath path) {
         var trees = Trees.instance(task.task);
         var pos = trees.getSourcePositions();
         var root = path.getCompilationUnit();
@@ -125,11 +124,10 @@ public class ErrorProvider {
         d.code = "unused_throws";
         d.severity = DiagnosticSeverity.Information;
         d.tags = List.of(DiagnosticTag.Unnecessary);
-        d.codeActions = codeActions(d, uri);
         return d;
     }
 
-    private org.javacs.lsp.Diagnostic warnUnused(Element unusedEl, URI uri) {
+    private org.javacs.lsp.Diagnostic warnUnused(Element unusedEl) {
         var trees = Trees.instance(task.task);
         var path = trees.getPath(unusedEl);
         if (path == null) {
@@ -187,27 +185,18 @@ public class ErrorProvider {
             code = "unused_other";
             severity = DiagnosticSeverity.Information;
         }
-        return lspWarnUnused(severity, code, message, start, end, root, uri);
+        return lspWarnUnused(severity, code, message, start, end, root);
     }
 
     private org.javacs.lsp.Diagnostic lspWarnUnused(
-            int severity, String code, String message, int start, int end, CompilationUnitTree root, URI uri) {
+            int severity, String code, String message, int start, int end, CompilationUnitTree root) {
         var result = new org.javacs.lsp.Diagnostic();
         result.severity = severity;
         result.code = code;
         result.message = message;
         result.tags = List.of(DiagnosticTag.Unnecessary);
         result.range = RangeHelper.range(root, start, end);
-        result.codeActions = codeActions(result, uri);
         return result;
     }
 
-    private List<CodeAction> codeActions (org.javacs.lsp.Diagnostic d, URI uri) {
-        var p = new CodeActionParams();
-        p.textDocument = new TextDocumentIdentifier(uri);
-        p.context.diagnostics.add(d);
-
-        var provider = new CodeActionProvider(this.compiler);
-        return provider.codeActionForDiagnostics(p);
-    }
 }

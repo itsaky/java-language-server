@@ -8,6 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.StandardOpenOption;
 import java.util.List;
 import java.util.stream.Collectors;
+
 import org.javacs.completion.CompletionProvider;
 import org.javacs.lsp.*;
 import org.junit.Ignore;
@@ -119,6 +120,13 @@ public class CompletionsTest extends CompletionsBase {
         var file = "/org/javacs/example/CompleteInheritedMembers.java";
         var suggestions = filterText(file, 5, 15);
         assertThat(suggestions, hasItems("superMethod", "subMethod"));
+    }
+    
+    @Test
+    public void overrideSuperMethod() {
+    	var file = "/org/javacs/example/CompleteInheritedMembers.java";
+        var suggestions = filterText(file, 22, 9);
+        assertThat(suggestions, hasItems("superMethod"));
     }
 
     @Test

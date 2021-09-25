@@ -57,6 +57,7 @@ public class ConvertVariableToStatement implements Rewrite {
 
     /** https://docs.oracle.com/javase/specs/jls/se13/html/jls-14.html#jls-14.8 */
     static boolean isExpressionStatement(Tree t) {
+        if(t == null) return false;
         switch (t.getKind()) {
             case ASSIGNMENT:
             case PREFIX_INCREMENT:
