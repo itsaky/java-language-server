@@ -1,8 +1,9 @@
 package org.javacs.markup;
 
 import com.sun.source.tree.CompilationUnitTree;
-import org.javacs.lsp.Position;
-import org.javacs.lsp.Range;
+
+import org.eclipse.lsp4j.Position;
+import org.eclipse.lsp4j.Range;
 
 class RangeHelper {
     static Range range(CompilationUnitTree root, long start, long end) {

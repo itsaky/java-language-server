@@ -21,8 +21,7 @@ import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
 import org.javacs.CompileTask;
 import org.javacs.CompilerProvider;
-import org.javacs.lsp.Range;
-import org.javacs.lsp.TextEdit;
+import org.eclipse.lsp4j.*;
 
 public class CreateMissingMethod implements Rewrite {
     final Path file;

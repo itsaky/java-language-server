@@ -34,7 +34,9 @@ import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeVariable;
-
+import org.eclipse.lsp4j.*;
+import org.eclipse.lsp4j.jsonrpc.CancelChecker;
+import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.javacs.CompileTask;
 import org.javacs.CompilerProvider;
 import org.javacs.CompletionData;
@@ -43,17 +45,13 @@ import org.javacs.JsonHelper;
 import org.javacs.ParseTask;
 import org.javacs.SourceFileObject;
 import org.javacs.StringSearch;
-import org.javacs.lsp.Command;
-import org.javacs.lsp.CompletionItem;
-import org.javacs.lsp.CompletionItemKind;
-import org.javacs.lsp.CompletionList;
-import org.javacs.lsp.InsertTextFormat;
-import org.javacs.lsp.TextEdit;
 import org.javacs.rewrite.AddImport;
 
 public class CompletionProvider {
-    private final CompilerProvider compiler;
     
+    private CancelChecker checker;
+    
+    private final CompilerProvider compiler;
     public static final CompletionList NOT_SUPPORTED = new CompletionList(false, List.of());
     public static final int MAX_COMPLETION_ITEMS = 50;
 
@@ -125,18 +123,25 @@ public class CompletionProvider {
         this.compiler = compiler;
     }
 
-    public CompletionList complete(Path file, int line, int column) {
+    public Either<List<CompletionItem>, CompletionList> complete(CancelChecker checker, Path file, int line, int column) {
+        this.checker = checker;
+        // Check if the request was cancelled
+        checker.checkCanceled();
+        
         LOG.info("Complete at " + file.getFileName() + "(" + line + "," + column + ")...");
         var started = Instant.now();
         var task = compiler.parse(file);
         var cursor = task.root.getLineMap().getPosition(line, column);
         var contents = new PruneMethodBodies(task.task).scan(task.root, cursor);
         var endOfLine = endOfLine(contents, (int) cursor);
+        LOG.info("endOfLine: " + endOfLine);
+        checker.checkCanceled();
+        
         contents.insert(endOfLine, ';');
         var list = compileAndComplete(file, contents.toString(), cursor);
         addTopLevelSnippets(task, list);
-        logCompletionTiming(started, list.items, list.isIncomplete);
-        return list;
+        logCompletionTiming(started, list.getItems(), list.isIncomplete());
+        return Either.forRight( list);
     }
 
     private int endOfLine(CharSequence contents, int cursor) {
@@ -154,6 +159,7 @@ public class CompletionProvider {
         var partial = partialIdentifier(contents, (int) cursor);
         var endsWithParen = endsWithParen(contents, (int) cursor);
         LOG.info("Partial identifier: " + partial + " endsWithParen: " + endsWithParen);
+        checker.checkCanceled();
         try (var task = compiler.compile(List.of(source))) {
             LOG.info("...compiled in " + Duration.between(started, Instant.now()).toMillis() + "ms");
             var path = new FindCompletionsAt(task.task).scan(task.root(), cursor);
@@ -170,6 +176,7 @@ public class CompletionProvider {
                     return completeImport(qualifiedPartialIdentifier(contents, (int) cursor), file);
                 default:
                     var list = new CompletionList();
+                    list.setItems(new ArrayList<CompletionItem>());
                     addKeywords(path, partial, list);
                     return list;
             }
@@ -177,16 +184,18 @@ public class CompletionProvider {
     }
 
 	private void addTopLevelSnippets(ParseTask task, CompletionList list) {
+	    checker.checkCanceled();
         var file = Paths.get(task.root.getSourceFile().toUri());
         if (!hasTypeDeclaration(task.root)) {
-            list.items.add(classSnippet(file));
+            list.getItems().add(classSnippet(file));
             if (task.root.getPackage() == null) {
-                list.items.add(packageSnippet(file));
+                list.getItems().add(packageSnippet(file));
             }
         }
     }
 
     private boolean hasTypeDeclaration(CompilationUnitTree root) {
+        checker.checkCanceled();
         for (var tree : root.getTypeDecls()) {
             if (tree.getKind() != Tree.Kind.ERRONEOUS) {
                 return true;
@@ -196,17 +205,20 @@ public class CompletionProvider {
     }
 
     private CompletionItem packageSnippet(Path file) {
+        checker.checkCanceled();
         var name = FileStore.suggestedPackageName(file);
         return snippetItem("package " + name, "package " + name + ";\n\n");
     }
 
     private CompletionItem classSnippet(Path file) {
+        checker.checkCanceled();
         var name = file.getFileName().toString();
         name = name.substring(0, name.length() - ".java".length());
         return snippetItem("class " + name, "class " + name + " {\n    $0\n}");
     }
 
     private String partialIdentifier(String contents, int end) {
+        checker.checkCanceled();
         var start = end;
         while (start > 0 && Character.isJavaIdentifierPart(contents.charAt(start - 1))) {
             start--;
@@ -215,6 +227,7 @@ public class CompletionProvider {
     }
 
     private boolean endsWithParen(String contents, int cursor) {
+        checker.checkCanceled();
         for (var i = cursor; i < contents.length(); i++) {
             if (!Character.isJavaIdentifierPart(contents.charAt(i))) {
                 return contents.charAt(i) == '(';
@@ -224,6 +237,7 @@ public class CompletionProvider {
     }
 
     private String qualifiedPartialIdentifier(String contents, int end) {
+        checker.checkCanceled();
         var start = end;
         while (start > 0 && isQualifiedIdentifierChar(contents.charAt(start - 1))) {
             start--;
@@ -232,15 +246,17 @@ public class CompletionProvider {
     }
 
     private boolean isQualifiedIdentifierChar(char c) {
+        checker.checkCanceled();
         return c == '.' || Character.isJavaIdentifierPart(c);
     }
 
     private CompletionList completeIdentifier(CompileTask task, TreePath path, String partial, boolean endsWithParen, Path file) {
+        checker.checkCanceled();
         LOG.info("...complete identifiers");
         var list = new CompletionList();
-        list.items = completeUsingScope(task, path, partial, endsWithParen);
+        list.setItems(completeUsingScope(task, path, partial, endsWithParen));
         addStaticImports(task, path.getCompilationUnit(), partial, endsWithParen, list);
-        if (!list.isIncomplete && partial.length() > 0 && Character.isUpperCase(partial.charAt(0))) {
+        if (!list.isIncomplete() && partial.length() > 0 && Character.isUpperCase(partial.charAt(0))) {
             addClassNames(path.getCompilationUnit(), partial, list, file);
         }
         addKeywords(path, partial, list);
@@ -248,6 +264,7 @@ public class CompletionProvider {
     }
 
     private void addKeywords(TreePath path, String partial, CompletionList list) {
+        checker.checkCanceled();
         var level = findTreeLevel(path);
         String[] keywords = {};
         if (level instanceof CompilationUnitTree) {
@@ -259,12 +276,13 @@ public class CompletionProvider {
         }
         for (var k : keywords) {
             if (StringSearch.matchesPartialName(k, partial)) {
-                list.items.add(keyword(k));
+                list.getItems().add(keyword(k));
             }
         }
     }
 
     private Tree findTreeLevel(TreePath path) {
+        checker.checkCanceled();
         while (path != null) {
             if (path.getLeaf() instanceof CompilationUnitTree
                     || path.getLeaf() instanceof ClassTree
@@ -278,6 +296,7 @@ public class CompletionProvider {
 
     private List<CompletionItem> completeUsingScope(
             CompileTask task, TreePath path, String partial, boolean endsWithParen) {
+    	checker.checkCanceled();
         var trees = Trees.instance(task.task);
         var list = new ArrayList<CompletionItem>();
         var methods = new HashMap<String, List<ExecutableElement>>();
@@ -299,9 +318,10 @@ public class CompletionProvider {
 
     private void addStaticImports(
             CompileTask task, CompilationUnitTree root, String partial, boolean endsWithParen, CompletionList list) {
+        checker.checkCanceled();
         var trees = Trees.instance(task.task);
         var methods = new HashMap<String, List<ExecutableElement>>();
-        var previousSize = list.items.size();
+        var previousSize = list.getItems().size();
         outer:
         for (var i : root.getImports()) {
             if (!i.isStatic()) continue;
@@ -316,52 +336,56 @@ public class CompletionProvider {
                 if (member.getKind() == ElementKind.METHOD) {
                     putMethod((ExecutableElement) member, methods);
                 } else {
-                    list.items.add(item(task, member));
+                    list.getItems().add(item(task, member));
                 }
-                if (list.items.size() + methods.size() > MAX_COMPLETION_ITEMS) {
-                    list.isIncomplete = true;
+                if (list.getItems().size() + methods.size() > MAX_COMPLETION_ITEMS) {
+                    list.setIsIncomplete(true);
                     break outer;
                 }
             }
         }
         for (var overloads : methods.values()) {
-            list.items.add(method(task, overloads, !endsWithParen));
+            list.getItems().add(method(task, overloads, !endsWithParen));
         }
-        LOG.info("...found " + (list.items.size() - previousSize) + " static imports");
+        LOG.info("...found " + (list.getItems().size() - previousSize) + " static imports");
     }
 
     private boolean importMatchesPartial(Name staticImport, String partial) {
+        checker.checkCanceled();
         return staticImport.contentEquals("*") || StringSearch.matchesPartialName(staticImport, partial);
     }
 
     private boolean memberMatchesImport(Name staticImport, Element member) {
+        checker.checkCanceled();
         return staticImport.contentEquals("*") || staticImport.contentEquals(member.getSimpleName());
     }
 
     private void addClassNames(CompilationUnitTree root, String partial, CompletionList list, Path file) {
+        checker.checkCanceled();
         var packageName = Objects.toString(root.getPackageName(), "");
         var uniques = new HashSet<String>();
-        var previousSize = list.items.size();
+        var previousSize = list.getItems().size();
         for (var className : compiler.packagePrivateTopLevelTypes(packageName)) {
             if (!StringSearch.matchesPartialName(className, partial)) continue;
-            list.items.add(classItem(className, file));
+            list.getItems().add(classItem(className, file));
             uniques.add(className);
         }
         for (var className : compiler.publicTopLevelTypes()) {
             if (!StringSearch.matchesPartialName(simpleName(className), partial)) continue;
             if (uniques.contains(className)) continue;
-            if (list.items.size() > MAX_COMPLETION_ITEMS) {
-                list.isIncomplete = true;
+            if (list.getItems().size() > MAX_COMPLETION_ITEMS) {
+                list.setIsIncomplete(true);
                 break;
             }
-            list.items.add(classItem(className, file));
+            list.getItems().add(classItem(className, file));
             uniques.add(className);
         }
-        LOG.info("...found " + (list.items.size() - previousSize) + " class names");
+        LOG.info("...found " + (list.getItems().size() - previousSize) + " class names");
     }
 
     private CompletionList completeMemberSelect(
             CompileTask task, TreePath path, String partial, boolean endsWithParen) {
+        checker.checkCanceled();
         var trees = Trees.instance(task.task);
         var select = (MemberSelectTree) path.getLeaf();
         LOG.info("...complete members of " + select.getExpression());
@@ -381,17 +405,20 @@ public class CompletionProvider {
     }
 
     private CompletionList completeArrayMemberSelect(boolean isStatic) {
+        checker.checkCanceled();
         if (isStatic) {
             return EMPTY;
         } else {
             var list = new CompletionList();
-            list.items.add(keyword("length"));
+            list.setItems(new ArrayList<CompletionItem>());
+            list.getItems().add(keyword("length"));
             return list;
         }
     }
 
     private CompletionList completeTypeVariableMemberSelect(
             CompileTask task, Scope scope, TypeVariable type, boolean isStatic, String partial, boolean endsWithParen) {
+        checker.checkCanceled();
         if (type.getUpperBound() instanceof DeclaredType) {
             return completeDeclaredTypeMemberSelect(
                     task, scope, (DeclaredType) type.getUpperBound(), isStatic, partial, endsWithParen);
@@ -405,6 +432,7 @@ public class CompletionProvider {
 
     private CompletionList completeDeclaredTypeMemberSelect(
             CompileTask task, Scope scope, DeclaredType type, boolean isStatic, String partial, boolean endsWithParen) {
+        checker.checkCanceled();
         var trees = Trees.instance(task.task);
         var typeElement = (TypeElement) type.asElement();
         var list = new ArrayList<CompletionItem>();
@@ -434,6 +462,7 @@ public class CompletionProvider {
     }
 
     private boolean isEnclosingClass(DeclaredType type, Scope start) {
+        checker.checkCanceled();
         for (var s : ScopeHelper.fastScopes(start)) {
             // If we reach a static method, stop looking
             var method = s.getEnclosingMethod();
@@ -454,6 +483,7 @@ public class CompletionProvider {
     }
 
     private CompletionList completeMemberReference(CompileTask task, TreePath path, String partial) {
+        checker.checkCanceled();
         var trees = Trees.instance(task.task);
         var select = (MemberReferenceTree) path.getLeaf();
         LOG.info("...complete methods of " + select.getQualifierExpression());
@@ -474,9 +504,11 @@ public class CompletionProvider {
     }
 
     private CompletionList completeArrayMemberReference(boolean isStatic) {
+        checker.checkCanceled();
         if (isStatic) {
             var list = new CompletionList();
-            list.items.add(keyword("new"));
+            list.setItems(new ArrayList<CompletionItem>());
+            list.getItems().add(keyword("new"));
             return list;
         } else {
             return EMPTY;
@@ -485,6 +517,7 @@ public class CompletionProvider {
 
     private CompletionList completeTypeVariableMemberReference(
             CompileTask task, Scope scope, TypeVariable type, boolean isStatic, String partial) {
+        checker.checkCanceled();
         if (type.getUpperBound() instanceof DeclaredType) {
             return completeDeclaredTypeMemberReference(
                     task, scope, (DeclaredType) type.getUpperBound(), isStatic, partial);
@@ -498,6 +531,8 @@ public class CompletionProvider {
 
     private CompletionList completeDeclaredTypeMemberReference(
             CompileTask task, Scope scope, DeclaredType type, boolean isStatic, String partial) {
+            	
+        checker.checkCanceled();
         var trees = Trees.instance(task.task);
         var typeElement = (TypeElement) type.asElement();
         var list = new ArrayList<CompletionItem>();
@@ -526,6 +561,7 @@ public class CompletionProvider {
     private static final CompletionList EMPTY = new CompletionList(false, List.of());
 
     private void putMethod(ExecutableElement method, Map<String, List<ExecutableElement>> methods) {
+        checker.checkCanceled();
         var name = method.getSimpleName().toString();
         if (!methods.containsKey(name)) {
             methods.put(name, new ArrayList<>());
@@ -534,6 +570,7 @@ public class CompletionProvider {
     }
 
     private CompletionList completeSwitchConstant(CompileTask task, TreePath path, String partial) {
+        checker.checkCanceled();
         var switchTree = (SwitchTree) path.getLeaf();
         path = new TreePath(path, switchTree.getExpression());
         var type = Trees.instance(task.task).getTypeMirror(path);
@@ -553,9 +590,11 @@ public class CompletionProvider {
     }
 
     private CompletionList completeImport(String path, Path file) {
+        checker.checkCanceled();
         LOG.info("...complete import");
         var names = new HashSet<String>();
         var list = new CompletionList();
+        list.setItems(new ArrayList<CompletionItem>());
         for (var className : compiler.publicTopLevelTypes()) {
             if (className.startsWith(path)) {
                 var start = path.lastIndexOf('.');
@@ -566,12 +605,12 @@ public class CompletionProvider {
                 names.add(segment);
                 var isClass = end == path.length();
                 if (isClass) {
-                    list.items.add(classItem(className, file));
+                    list.getItems().add(classItem(className, file));
                 } else {
-                    list.items.add(packageItem(segment));
+                    list.getItems().add(packageItem(segment));
                 }
-                if (list.items.size() > MAX_COMPLETION_ITEMS) {
-                    list.isIncomplete = true;
+                if (list.getItems().size() > MAX_COMPLETION_ITEMS) {
+                    list.setIsIncomplete(true);
                     return list;
                 }
             }
@@ -580,79 +619,85 @@ public class CompletionProvider {
     }
 
     private CompletionItem packageItem(String name) {
+        checker.checkCanceled();
         var i = new CompletionItem();
-        i.label = name;
-        i.kind = CompletionItemKind.Module;
+        i.setLabel(name);
+        i.setKind(CompletionItemKind.Module);
         return i;
     }
 
     private CompletionItem classItem(String className, Path file) {
+        checker.checkCanceled();
         var i = new CompletionItem();
         
-        i.additionalTextEdits = new ArrayList<>();
+        i.setAdditionalTextEdits(new ArrayList<>());
         if (!compiler.containsImport(file, className)) {
             var add = new AddImport(file, className);
             TextEdit[] edits = add.rewrite(compiler).get(file);
             if (edits != null) {
-                Collections.addAll(i.additionalTextEdits, edits);
+                Collections.addAll(i.getAdditionalTextEdits(), edits);
             }
         }
 
-        i.label = simpleName(className).toString();
-        i.kind = CompletionItemKind.Class;
-        i.detail = className;
+        i.setLabel(simpleName(className).toString());
+        i.setKind(CompletionItemKind.Class);
+        i.setDetail(className);
         var data = new CompletionData();
         data.className = className;
-        i.data = JsonHelper.GSON.toJsonTree(data);
+        i.setData(data);
         return i;
     }
 
     private CompletionItem snippetItem(String label, String snippet) {
+        checker.checkCanceled();
         var i = new CompletionItem();
-        i.label = label;
-        i.kind = CompletionItemKind.Snippet;
-        i.insertText = snippet;
-        i.insertTextFormat = InsertTextFormat.Snippet;
-        i.sortText = String.format("%02d%s", Priority.SNIPPET, i.label);
+        i.setLabel(label);
+        i.setKind(CompletionItemKind.Snippet);
+        i.setInsertText(snippet);
+        i.setInsertTextFormat( InsertTextFormat.Snippet);
+        i.setSortText(String.format("%02d%s", Priority.SNIPPET, i.getLabel()));
         return i;
     }
 
     private CompletionItem item(CompileTask task, Element element) {
+        checker.checkCanceled();
         if (element.getKind() == ElementKind.METHOD) throw new RuntimeException("method");
         var i = new CompletionItem();
-        i.label = element.getSimpleName().toString();
-        i.kind = kind(element);
-        i.detail = element.toString();
-        i.data = JsonHelper.GSON.toJsonTree(data(task, element, 1));
+        i.setLabel(element.getSimpleName().toString());
+        i.setKind(kind(element));
+        i.setDetail(element.toString());
+        i.setData(data(task, element, 1));
         return i;
     }
 
     private CompletionItem method(CompileTask task, List<ExecutableElement> overloads, boolean addParens) {
+        checker.checkCanceled();
         var first = overloads.get(0);
         var i = new CompletionItem();
-        i.label = first.getSimpleName().toString();
-        i.kind = CompletionItemKind.Method;
-        i.detail = first.getReturnType() + " " + first;
+        i.setLabel(first.getSimpleName().toString());
+        i.setKind(CompletionItemKind.Method);
+        i.setDetail(first.getReturnType() + " " + first);
         var data = data(task, first, overloads.size());
-        i.data = JsonHelper.GSON.toJsonTree(data);
+        i.setData(JsonHelper.GSON.toJsonTree(data));
         
         if (addParens) {
             if (overloads.size() == 1 && first.getParameters().isEmpty()) {
-                	i.insertText = first.getSimpleName() + "()$0";
+                	i.setInsertText(first.getSimpleName() + "()$0");
             	} else {
-                	i.insertText = first.getSimpleName() + "($0)";
+                	i.setInsertText( first.getSimpleName() + "($0)");
                 	// Activate signatureHelp
                 	// Remove this if VSCode ever fixes https://github.com/microsoft/vscode/issues/78806
-                	i.command = new Command();
-                	i.command.command = "editor.action.triggerParameterHints";
-                	i.command.title = "Trigger Parameter Hints";
+                	i.setCommand( new Command());
+                	i.getCommand().setCommand("editor.action.triggerParameterHints");
+                	i.getCommand().setTitle("Trigger Parameter Hints");
             	}
-            i.insertTextFormat = 2; // Snippet
+            i.setInsertTextFormat(InsertTextFormat.Snippet); // Snippet
         }
         return i;
     }
 
 	private CompletionData data(CompileTask task, Element element, int overloads) {
+	       checker.checkCanceled();
         var data = new CompletionData();
         if (element instanceof TypeElement) {
             var type = (TypeElement) element;
@@ -680,7 +725,8 @@ public class CompletionProvider {
         return data;
     }
 
-    private Integer kind(Element e) {
+    private CompletionItemKind kind(Element e) {
+        checker.checkCanceled();
         switch (e.getKind()) {
             case ANNOTATION_TYPE:
                 return CompletionItemKind.Interface;
@@ -720,11 +766,12 @@ public class CompletionProvider {
     }
 
     private CompletionItem keyword(String keyword) {
+        checker.checkCanceled();
         var i = new CompletionItem();
-        i.label = keyword;
-        i.kind = CompletionItemKind.Keyword;
-        i.detail = "keyword";
-        i.sortText = String.format("%02d%s", Priority.KEYWORD, i.label);
+        i.setLabel(keyword);
+        i.setKind(CompletionItemKind.Keyword);
+        i.setDetail("keyword");
+        i.setSortText( String.format("%02d%s", Priority.KEYWORD, i.getLabel()));
         return i;
     }
 
@@ -747,12 +794,14 @@ public class CompletionProvider {
     }
 
     private void logCompletionTiming(Instant started, List<?> list, boolean isIncomplete) {
+        checker.checkCanceled();
         var elapsedMs = Duration.between(started, Instant.now()).toMillis();
         if (isIncomplete) LOG.info(String.format("Found %d items (incomplete) in %,d ms", list.size(), elapsedMs));
         else LOG.info(String.format("...found %d items in %,d ms", list.size(), elapsedMs));
     }
 
     private CharSequence simpleName(String className) {
+        checker.checkCanceled();
         var dot = className.lastIndexOf('.');
         if (dot == -1) return className;
         return className.subSequence(dot + 1, className.length());

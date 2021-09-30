@@ -8,11 +8,12 @@ import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.TypeKind;
 import javax.tools.JavaFileObject;
+import org.eclipse.lsp4j.*;
+import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 import org.javacs.CompileTask;
 import org.javacs.CompilerProvider;
 import org.javacs.FindHelper;
 import org.javacs.SourceFileObject;
-import org.javacs.lsp.Location;
 
 public class DefinitionProvider {
     private final CompilerProvider compiler;
@@ -28,16 +29,19 @@ public class DefinitionProvider {
         this.column = column;
     }
 
-    public List<Location> find() {
+    public List<Location> find(CancelChecker checker) {
         try (var task = compiler.compile(file)) {
+            checker.checkCanceled();
             var element = NavigationHelper.findElement(task, file, line, column);
             if (element == null) return NOT_SUPPORTED;
             if (element.asType().getKind() == TypeKind.ERROR) {
                 task.close();
+                checker.checkCanceled();
                 return findError(element);
             }
             // TODO instead of checking isLocal, just try to resolve the location, fall back to searching
             if (NavigationHelper.isLocal(element)) {
+                checker.checkCanceled();
                 return findDefinitions(task, element);
             }
             var className = className(element);
@@ -45,9 +49,11 @@ public class DefinitionProvider {
             var otherFile = compiler.findAnywhere(className);
             if (otherFile.isEmpty()) return List.of();
             if (otherFile.get().toUri().equals(file.toUri())) {
+                checker.checkCanceled();
                 return findDefinitions(task, element);
             }
             task.close();
+            checker.checkCanceled();
             return findRemoteDefinitions(otherFile.get());
         }
     }

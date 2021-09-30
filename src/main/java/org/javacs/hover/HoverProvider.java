@@ -9,6 +9,9 @@ import java.util.List;
 import java.util.StringJoiner;
 import java.util.logging.Logger;
 import javax.lang.model.element.*;
+import org.eclipse.lsp4j.*;
+import org.eclipse.lsp4j.jsonrpc.CancelChecker;
+import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.javacs.CompileTask;
 import org.javacs.CompilerProvider;
 import org.javacs.CompletionData;
@@ -16,46 +19,54 @@ import org.javacs.FindHelper;
 import org.javacs.JsonHelper;
 import org.javacs.MarkdownHelper;
 import org.javacs.ParseTask;
-import org.javacs.lsp.CompletionItem;
-import org.javacs.lsp.MarkedString;
 
+@SuppressWarnings("deprecation")
 public class HoverProvider {
+    
     final CompilerProvider compiler;
-
-    public static final List<MarkedString> NOT_SUPPORTED = List.of();
+    
+    public static final List<Either<String, MarkedString>> NOT_SUPPORTED = List.of();
 
     public HoverProvider(CompilerProvider compiler) {
         this.compiler = compiler;
     }
 
-    public List<MarkedString> hover(Path file, int line, int column) {
+    public List<Either<String, MarkedString>> hover(CancelChecker checker, Path file, int line, int column) {
         try (var task = compiler.compile(file)) {
+            checker.checkCanceled();
             var position = task.root().getLineMap().getPosition(line, column);
             var element = new FindHoverElement(task.task).scan(task.root(), position);
+            checker.checkCanceled();
             if (element == null) return NOT_SUPPORTED;
-            var list = new ArrayList<MarkedString>();
+            var list = new ArrayList<Either<String, MarkedString>>();
             var code = printType(element);
-            list.add(new MarkedString("java", code));
+            list.add(Either.forRight(new MarkedString("java", code)));
             var docs = docs(task, element);
             if (!docs.isEmpty()) {
-                list.add(new MarkedString(docs));
+                list.add(Either.forRight(new MarkedString("java", docs)));
             }
             return list;
         }
     }
 
-    public void resolveCompletionItem(CompletionItem item) {
-        if (item.data == null || item.data == JsonNull.INSTANCE) return;
-        var data = JsonHelper.GSON.fromJson(item.data, CompletionData.class);
+    public void resolveCompletionItem(CancelChecker checker, CompletionItem item) {
+        if (item.getData() == null || item.getData() == JsonNull.INSTANCE) return;
+        var data = JsonHelper.GSON.fromJson(JsonHelper.GSON.toJsonTree(item.getData()), CompletionData.class);
+        checker.checkCanceled();
         var source = compiler.findAnywhere(data.className);
+        checker.checkCanceled();
         if (source.isEmpty()) return;
         var task = compiler.parse(source.get());
+        checker.checkCanceled();
         var tree = findItem(task, data);
+        checker.checkCanceled();
         resolveDetail(item, data, tree);
+        checker.checkCanceled();
         var path = Trees.instance(task.task).getPath(task.root, tree);
+        checker.checkCanceled();
         var docTree = DocTrees.instance(task.task).getDocCommentTree(path);
         if (docTree == null) return;
-        item.documentation = MarkdownHelper.asMarkupContent(docTree);
+        item.setDocumentation(MarkdownHelper.asMarkupContent(docTree));
     }
 
     // TODO consider showing actual source code instead of just types and names
@@ -66,16 +77,16 @@ public class HoverProvider {
             for (var p : method.getParameters()) {
                 parameters.add(p.getType() + " " + p.getName());
             }
-            item.detail = method.getReturnType() + " " + method.getName() + "(" + parameters + ")";
+            item.setDetail(method.getReturnType() + " " + method.getName() + "(" + parameters + ")");
             if (!method.getThrows().isEmpty()) {
                 var exceptions = new StringJoiner(", ");
                 for (var e : method.getThrows()) {
                     exceptions.add(e.toString());
                 }
-                item.detail += " throws " + exceptions;
+                item.setDetail(item.getDetail() + " throws " + exceptions);
             }
             if (data.plusOverloads != 0) {
-                item.detail += " (+" + data.plusOverloads + " overloads)";
+                item.setDetail(" (+" + data.plusOverloads + " overloads)");
             }
         }
     }

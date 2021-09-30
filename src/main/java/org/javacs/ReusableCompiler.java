@@ -46,6 +46,7 @@ import com.sun.tools.javac.util.Log;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Stack;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
@@ -79,10 +80,9 @@ class ReusableCompiler {
 
     private static final Logger LOG = Logger.getLogger("main");
     private static final JavacTool systemProvider = JavacTool.create();
-
+    
     private List<String> currentOptions = new ArrayList<>();
     private ReusableContext currentContext;
-    private boolean checkedOut;
 
     /**
      * Creates a new task as if by {@link javax.tools.JavaCompiler#getTask} and runs the provided worker with it. The
@@ -107,10 +107,7 @@ class ReusableCompiler {
             Iterable<String> options,
             Iterable<String> classes,
             Iterable<? extends JavaFileObject> compilationUnits) {
-        if (checkedOut) {
-            throw new RuntimeException("Compiler is already in-use!");
-        }
-        checkedOut = true;
+        
         List<String> opts =
                 StreamSupport.stream(options.spliterator(), false).collect(Collectors.toCollection(ArrayList::new));
         if (!opts.equals(currentOptions)) {
@@ -124,7 +121,7 @@ class ReusableCompiler {
                                 null, fileManager, diagnosticListener, opts, classes, compilationUnits, currentContext);
 
         task.addTaskListener(currentContext);
-
+        
         return new Borrow(task, currentContext);
     }
 
@@ -149,7 +146,7 @@ class ReusableCompiler {
             } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
                 throw new RuntimeException(e);
             }
-            checkedOut = false;
+            
             closed = true;
         }
     }

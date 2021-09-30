@@ -6,9 +6,7 @@ import java.nio.file.Path;
 import java.util.Map;
 import org.javacs.CompilerProvider;
 import org.javacs.ParseTask;
-import org.javacs.lsp.Position;
-import org.javacs.lsp.Range;
-import org.javacs.lsp.TextEdit;
+import org.eclipse.lsp4j.*;
 
 public class AddImport implements Rewrite {
     final Path file;

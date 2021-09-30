@@ -4,7 +4,7 @@ import com.sun.source.util.Trees;
 import java.nio.file.Path;
 import java.util.Map;
 import org.javacs.CompilerProvider;
-import org.javacs.lsp.TextEdit;
+import org.eclipse.lsp4j.*;
 
 public class RenameVariable implements Rewrite {
     final Path file;

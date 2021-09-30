@@ -4,9 +4,11 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Logger;
+import org.eclipse.lsp4j.*;
+import org.eclipse.lsp4j.jsonrpc.CancelChecker;
+import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.javacs.CompilerProvider;
 import org.javacs.ParseTask;
-import org.javacs.lsp.SymbolInformation;
 
 public class SymbolProvider {
 
@@ -16,7 +18,7 @@ public class SymbolProvider {
         this.compiler = compiler;
     }
 
-    public List<SymbolInformation> findSymbols(String query, int limit) {
+    public List<SymbolInformation> findSymbols(CancelChecker checker, String query, int limit) {
         LOG.info(String.format("Searching for `%s`...", query));
         var result = new ArrayList<SymbolInformation>();
         var checked = 0;
@@ -26,7 +28,9 @@ public class SymbolProvider {
             // Parse the file and check class members for matches
             LOG.info(String.format("...%s contains text matches", file.getFileName()));
             var task = compiler.parse(file);
-            var symbols = findSymbolsMatching(task, query);
+            checker.checkCanceled();
+            var symbols = findSymbolsMatching(checker, task, query);
+            checker.checkCanceled();
             parsed++;
             // If we confirm matches, add them to the results
             if (symbols.size() > 0) {
@@ -40,13 +44,20 @@ public class SymbolProvider {
         return result;
     }
 
-    public List<SymbolInformation> documentSymbols(Path file) {
+    public List<Either<SymbolInformation, DocumentSymbol>> documentSymbols(CancelChecker checker, Path file) {
         var task = compiler.parse(file);
-        return findSymbolsMatching(task, "");
+        checker.checkCanceled();
+        var symbols = findSymbolsMatching(checker, task, "");
+        var result = new ArrayList<Either<SymbolInformation, DocumentSymbol>>();
+        for(var symbol : symbols) {
+        	result.add(Either.forLeft(symbol));
+        }
+        return result;
     }
 
-    private List<SymbolInformation> findSymbolsMatching(ParseTask task, String query) {
+    private List<SymbolInformation> findSymbolsMatching(CancelChecker checker, ParseTask task, String query) {
         var found = new ArrayList<SymbolInformation>();
+        checker.checkCanceled();
         new FindSymbolsMatching(task, query).scan(task.root, found);
         return found;
     }

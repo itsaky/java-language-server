@@ -15,9 +15,7 @@ import java.util.logging.Logger;
 import javax.lang.model.element.Modifier;
 import org.javacs.CompileTask;
 import org.javacs.CompilerProvider;
-import org.javacs.lsp.Position;
-import org.javacs.lsp.Range;
-import org.javacs.lsp.TextEdit;
+import org.eclipse.lsp4j.*;
 
 public class GenerateRecordConstructor implements Rewrite {
     final String className;

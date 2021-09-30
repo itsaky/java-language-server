@@ -4,7 +4,7 @@ import java.nio.file.Path;
 import java.util.Map;
 import org.javacs.CompilerProvider;
 import org.javacs.FindTypeDeclarationAt;
-import org.javacs.lsp.TextEdit;
+import org.eclipse.lsp4j.*;
 
 public class RemoveClass implements Rewrite {
     final Path file;

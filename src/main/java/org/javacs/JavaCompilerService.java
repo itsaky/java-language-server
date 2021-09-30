@@ -59,9 +59,6 @@ class JavaCompilerService implements CompilerProvider {
 
     private void loadCompile(Collection<? extends JavaFileObject> sources) {
         if (cachedCompile != null) {
-            if (!cachedCompile.closed) {
-                throw new RuntimeException("Compiler is still in-use!");
-            }
             cachedCompile.borrow.close();
         }
         cachedCompile = doCompile(sources);

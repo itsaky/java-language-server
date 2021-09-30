@@ -7,11 +7,8 @@ import com.sun.source.util.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import org.eclipse.lsp4j.*;
 import org.javacs.FileStore;
-import org.javacs.lsp.CodeLens;
-import org.javacs.lsp.Command;
-import org.javacs.lsp.Position;
-import org.javacs.lsp.Range;
 
 class FindCodeLenses extends TreeScanner<Void, List<CodeLens>> {
     private final JavacTask task;
@@ -76,7 +73,7 @@ class FindCodeLenses extends TreeScanner<Void, List<CodeLens>> {
     }
 
     private CodeLens runAllTests(ClassTree t) {
-        var arguments = new JsonArray();
+        var arguments = new ArrayList<Object>();
         arguments.add(root.getSourceFile().toUri().toString());
         arguments.add(String.join(".", qualifiedName));
         arguments.add(JsonNull.INSTANCE);
@@ -86,7 +83,7 @@ class FindCodeLenses extends TreeScanner<Void, List<CodeLens>> {
     }
 
     private CodeLens runTest(MethodTree t) {
-        var arguments = new JsonArray();
+        var arguments = new ArrayList<Object>();
         arguments.add(root.getSourceFile().toUri().toString());
         arguments.add(String.join(".", qualifiedName));
         arguments.add(t.getName().toString());
@@ -96,7 +93,7 @@ class FindCodeLenses extends TreeScanner<Void, List<CodeLens>> {
     }
 
     private CodeLens debugTest(MethodTree t) {
-        var arguments = new JsonArray();
+        var arguments = new ArrayList<Object>();
         arguments.add(root.getSourceFile().toUri().toString());
         arguments.add(String.join(".", qualifiedName));
         arguments.add(t.getName().toString());

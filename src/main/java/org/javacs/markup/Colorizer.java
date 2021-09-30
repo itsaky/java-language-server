@@ -5,9 +5,10 @@ import com.sun.source.util.*;
 import java.nio.file.Paths;
 import javax.lang.model.element.*;
 import org.javacs.FileStore;
-import org.javacs.lsp.Range;
+import org.eclipse.lsp4j.*;
 
 import static javax.lang.model.element.ElementKind.*;
+import static org.javacs.JavaLanguageServer.Range_NONE;
 
 class Colorizer extends TreePathScanner<Void, SemanticColors> {
     private final Trees trees;
@@ -35,7 +36,7 @@ class Colorizer extends TreePathScanner<Void, SemanticColors> {
         }
         
         var range = find(fromPath, name);
-        if(range == Range.NONE)
+        if(range == Range_NONE)
             return;
         
         var kind = toEl.getKind();
@@ -142,7 +143,7 @@ class Colorizer extends TreePathScanner<Void, SemanticColors> {
         }
         // If no position, give up
         if (start == -1 || end == -1) {
-            return Range.NONE;
+            return Range_NONE;
         }
         // Find name inside expression
         var file = Paths.get(root.getSourceFile().toUri());

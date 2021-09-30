@@ -2,8 +2,9 @@ package org.javacs.rewrite;
 
 import java.nio.file.Path;
 import java.util.Map;
+
+import org.eclipse.lsp4j.TextEdit;
 import org.javacs.CompilerProvider;
-import org.javacs.lsp.TextEdit;
 
 public interface Rewrite {
     /** Perform a rewrite across the entire codebase. */

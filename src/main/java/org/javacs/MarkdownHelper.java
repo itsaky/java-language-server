@@ -18,8 +18,7 @@ import javax.xml.transform.TransformerException;
 import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
-import org.javacs.lsp.MarkupContent;
-import org.javacs.lsp.MarkupKind;
+import org.eclipse.lsp4j.*;
 import org.w3c.dom.Document;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
@@ -29,8 +28,8 @@ public class MarkdownHelper {
     public static MarkupContent asMarkupContent(DocCommentTree comment) {
         var markdown = asMarkdown(comment);
         var content = new MarkupContent();
-        content.kind = MarkupKind.Markdown;
-        content.value = markdown;
+        content.setKind(MarkupKind.MARKDOWN);
+        content.setValue(markdown);
         return content;
     }
 

@@ -5,7 +5,7 @@ import java.nio.file.Path;
 import java.util.Map;
 import org.javacs.CompilerProvider;
 import org.javacs.FindHelper;
-import org.javacs.lsp.TextEdit;
+import org.eclipse.lsp4j.*;
 
 public class RemoveMethod implements Rewrite {
     final String className, methodName;

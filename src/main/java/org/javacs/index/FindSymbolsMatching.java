@@ -4,13 +4,9 @@ import com.sun.source.tree.*;
 import com.sun.source.util.*;
 import java.util.List;
 import java.util.Objects;
+import org.eclipse.lsp4j.*;
 import org.javacs.ParseTask;
 import org.javacs.StringSearch;
-import org.javacs.lsp.Location;
-import org.javacs.lsp.Position;
-import org.javacs.lsp.Range;
-import org.javacs.lsp.SymbolInformation;
-import org.javacs.lsp.SymbolKind;
 
 class FindSymbolsMatching extends TreePathScanner<Void, List<SymbolInformation>> {
 
@@ -35,10 +31,10 @@ class FindSymbolsMatching extends TreePathScanner<Void, List<SymbolInformation>>
     public Void visitClass(ClassTree t, List<SymbolInformation> list) {
         if (StringSearch.matchesTitleCase(t.getSimpleName(), query)) {
             var info = new SymbolInformation();
-            info.name = t.getSimpleName().toString();
-            info.kind = asSymbolKind(t.getKind());
-            info.location = location(t);
-            info.containerName = containerName.toString();
+            info.setName(t.getSimpleName().toString());
+            info.setKind(asSymbolKind(t.getKind()));
+            info.setLocation(location(t));
+            info.setContainerName(containerName.toString());
             list.add(info);
         }
         var push = containerName;
@@ -52,10 +48,10 @@ class FindSymbolsMatching extends TreePathScanner<Void, List<SymbolInformation>>
     public Void visitMethod(MethodTree t, List<SymbolInformation> list) {
         if (StringSearch.matchesTitleCase(t.getName(), query)) {
             var info = new SymbolInformation();
-            info.name = t.getName().toString();
-            info.kind = asSymbolKind(t.getKind());
-            info.location = location(t);
-            info.containerName = containerName.toString();
+            info.setName(t.getName().toString());
+            info.setKind( asSymbolKind(t.getKind()));
+            info.setLocation(location(t));
+            info.setContainerName( containerName.toString());
             list.add(info);
         }
         var push = containerName;
@@ -70,10 +66,10 @@ class FindSymbolsMatching extends TreePathScanner<Void, List<SymbolInformation>>
         if (getCurrentPath().getParentPath().getLeaf() instanceof ClassTree
                 && StringSearch.matchesTitleCase(t.getName(), query)) {
             var info = new SymbolInformation();
-            info.name = t.getName().toString();
-            info.kind = asSymbolKind(t.getKind());
-            info.location = location(t);
-            info.containerName = containerName.toString();
+            info.setName(t.getName().toString());
+            info.setKind(asSymbolKind(t.getKind()));
+            info.setLocation(location(t));
+            info.setContainerName(containerName.toString());
             list.add(info);
         }
         var push = containerName;
@@ -83,7 +79,7 @@ class FindSymbolsMatching extends TreePathScanner<Void, List<SymbolInformation>>
         return null;
     }
 
-    private static Integer asSymbolKind(Tree.Kind k) {
+    private static SymbolKind asSymbolKind(Tree.Kind k) {
         switch (k) {
             case ANNOTATION_TYPE:
             case CLASS:
@@ -116,6 +112,6 @@ class FindSymbolsMatching extends TreePathScanner<Void, List<SymbolInformation>>
         var endLine = (int) lines.getLineNumber(end);
         var endColumn = (int) lines.getColumnNumber(end);
         var range = new Range(new Position(startLine - 1, startColumn - 1), new Position(endLine - 1, endColumn - 1));
-        return new Location(root.getSourceFile().toUri(), range);
+        return new Location(root.getSourceFile().toUri().toString(), range);
     }
 }

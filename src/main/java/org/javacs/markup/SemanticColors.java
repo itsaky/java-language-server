@@ -3,7 +3,8 @@ package org.javacs.markup;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
-import org.javacs.lsp.Range;
+
+import org.eclipse.lsp4j.Range;
 
 public class SemanticColors {
     public URI uri;

@@ -20,14 +20,13 @@ import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.*;
+import org.eclipse.lsp4j.*;
+import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 import org.javacs.CompileTask;
 import org.javacs.CompilerProvider;
 import org.javacs.FindHelper;
 import org.javacs.MarkdownHelper;
 import org.javacs.hover.ShortTypePrinter;
-import org.javacs.lsp.ParameterInformation;
-import org.javacs.lsp.SignatureHelp;
-import org.javacs.lsp.SignatureInformation;
 
 public class SignatureProvider {
 
@@ -39,17 +38,21 @@ public class SignatureProvider {
         this.compiler = compiler;
     }
 
-    public SignatureHelp signatureHelp(Path file, int line, int column) {
+    public SignatureHelp signatureHelp(CancelChecker checker, Path file, int line, int column) {
         // TODO prune
         try (var task = compiler.compile(file)) {
+            checker.checkCanceled();
             var cursor = task.root().getLineMap().getPosition(line, column);
             var path = new FindInvocationAt(task.task).scan(task.root(), cursor);
+            checker.checkCanceled();
             if (path == null) return NOT_SUPPORTED;
             if (path.getLeaf() instanceof MethodInvocationTree) {
                 var invoke = (MethodInvocationTree) path.getLeaf();
+                checker.checkCanceled();
                 var overloads = methodOverloads(task, invoke);
                 var signatures = new ArrayList<SignatureInformation>();
                 for (var method : overloads) {
+                    checker.checkCanceled();
                     var info = info(method);
                     addSourceInfo(task, method, info);
                     addFancyLabel(info);
@@ -64,6 +67,7 @@ public class SignatureProvider {
                 var overloads = constructorOverloads(task, invoke);
                 var signatures = new ArrayList<SignatureInformation>();
                 for (var method : overloads) {
+                    checker.checkCanceled();
                     var info = info(method);
                     addSourceInfo(task, method, info);
                     addFancyLabel(info);
@@ -150,11 +154,11 @@ public class SignatureProvider {
 
     private SignatureInformation info(ExecutableElement method) {
         var info = new SignatureInformation();
-        info.label = method.getSimpleName().toString();
+        info.setLabel(method.getSimpleName().toString());
         if (method.getKind() == ElementKind.CONSTRUCTOR) {
-            info.label = method.getEnclosingElement().getSimpleName().toString();
+            info.setLabel(method.getEnclosingElement().getSimpleName().toString());
         }
-        info.parameters = parameters(method);
+        info.setParameters(parameters(method));
         return info;
     }
 
@@ -168,7 +172,7 @@ public class SignatureProvider {
 
     private ParameterInformation parameter(VariableElement p) {
         var info = new ParameterInformation();
-        info.label = ShortTypePrinter.NO_PACKAGE.print(p.asType());
+        info.setLabel(ShortTypePrinter.NO_PACKAGE.print(p.asType()));
         return info;
     }
 
@@ -184,24 +188,24 @@ public class SignatureProvider {
         var path = Trees.instance(task.task).getPath(parse.root, source);
         var docTree = DocTrees.instance(task.task).getDocCommentTree(path);
         if (docTree != null) {
-            info.documentation = MarkdownHelper.asMarkupContent(docTree);
+            info.setDocumentation(MarkdownHelper.asMarkupContent(docTree));
         }
-        info.parameters = parametersFromSource(source);
+        info.setParameters(parametersFromSource(source));
     }
 
     private void addFancyLabel(SignatureInformation info) {
         var join = new StringJoiner(", ");
-        for (var p : info.parameters) {
-            join.add(p.label);
+        for (var p : info.getParameters()) {
+            join.add(p.getLabel().getLeft());
         }
-        info.label = info.label + "(" + join + ")";
+        info.setLabel(info.getLabel() + "(" + join + ")");
     }
 
     private List<ParameterInformation> parametersFromSource(MethodTree source) {
         var list = new ArrayList<ParameterInformation>();
         for (var p : source.getParameters()) {
             var info = new ParameterInformation();
-            info.label = p.getType() + " " + p.getName();
+            info.setLabel(p.getType() + " " + p.getName());
             list.add(info);
         }
         return list;

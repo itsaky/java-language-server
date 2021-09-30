@@ -5,9 +5,7 @@ import java.nio.file.Path;
 import java.util.Map;
 import javax.lang.model.element.Modifier;
 import org.javacs.CompilerProvider;
-import org.javacs.lsp.Position;
-import org.javacs.lsp.Range;
-import org.javacs.lsp.TextEdit;
+import org.eclipse.lsp4j.*;
 
 public class ConvertFieldToBlock implements Rewrite {
     final Path file;
@@ -43,7 +41,7 @@ public class ConvertFieldToBlock implements Rewrite {
         var deleteLhs = new Range(startPos, endPos);
         var fixLhs = new TextEdit(deleteLhs, "{ ");
         if (variable.getModifiers().getFlags().contains(Modifier.STATIC)) {
-            fixLhs.newText = "static { ";
+            fixLhs.setNewText("static { ");
         }
         var right = pos.getEndPosition(task.root, variable);
         var rightLine = (int) lines.getLineNumber(right);

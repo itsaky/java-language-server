@@ -3,6 +3,10 @@ package org.javacs;
 import com.sun.source.doctree.DocCommentTree;
 import com.sun.source.tree.*;
 import com.sun.source.util.*;
+
+import org.eclipse.lsp4j.Position;
+import org.eclipse.lsp4j.Range;
+
 import java.io.IOException;
 import java.nio.file.*;
 import java.time.Instant;
@@ -12,12 +16,12 @@ import java.util.regex.Pattern;
 import javax.lang.model.element.*;
 import javax.tools.JavaCompiler;
 import javax.tools.JavaFileObject;
-import org.javacs.lsp.*;
+
+import static org.javacs.JavaLanguageServer.Range_NONE;
 
 class Parser {
     private static final JavaCompiler COMPILER = ServiceLoader.load(JavaCompiler.class).iterator().next();
     private static final SourceFileManager FILE_MANAGER = new SourceFileManager();
-
     /** Create a task that compiles a single file */
     private static JavacTask singleFileTask(JavaFileObject file) {
         return (JavacTask)
@@ -100,7 +104,7 @@ class Parser {
         // If start is -1, give up
         if (start == -1) {
             LOG.warning(String.format("Couldn't locate `%s`", path.getLeaf()));
-            return Range.NONE;
+            return Range_NONE;
         }
         // If end is bad, guess based on start
         if (end == -1) {
@@ -119,7 +123,7 @@ class Parser {
             start = indexOf(contents, name, start);
             if (start == -1) {
                 LOG.warning(String.format("Couldn't find identifier `%s` in `%s`", name, path.getLeaf()));
-                return Range.NONE;
+                return Range_NONE;
             }
             end = start + name.length();
         }
@@ -138,7 +142,7 @@ class Parser {
             start = indexOf(contents, name, start);
             if (start == -1) {
                 LOG.warning(String.format("Couldn't find identifier `%s` in `%s`", name, path.getLeaf()));
-                return Range.NONE;
+                return Range_NONE;
             }
             end = start + name.length();
         }
@@ -154,7 +158,7 @@ class Parser {
             start = indexOf(contents, name, start);
             if (start == -1) {
                 LOG.warning(String.format("Couldn't find identifier `%s` in `%s`", name, path.getLeaf()));
-                return Range.NONE;
+                return Range_NONE;
             }
             end = start + name.length();
         }
@@ -164,7 +168,7 @@ class Parser {
             start = indexOf(contents, name, start);
             if (start == -1) {
                 LOG.warning(String.format("Couldn't find identifier `%s` in `%s`", name, path.getLeaf()));
-                return Range.NONE;
+                return Range_NONE;
             }
             end = start + name.length();
         }

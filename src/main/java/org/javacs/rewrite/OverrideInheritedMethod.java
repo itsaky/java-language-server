@@ -10,10 +10,9 @@ import javax.lang.model.type.ExecutableType;
 import org.javacs.CompilerProvider;
 import org.javacs.FindHelper;
 import org.javacs.FindTypeDeclarationAt;
+import org.javacs.JavaLanguageServer;
 import org.javacs.ParseTask;
-import org.javacs.lsp.Position;
-import org.javacs.lsp.Range;
-import org.javacs.lsp.TextEdit;
+import org.eclipse.lsp4j.*;
 
 public class OverrideInheritedMethod implements Rewrite {
     final String superClassName, methodName;
@@ -63,7 +62,7 @@ public class OverrideInheritedMethod implements Rewrite {
         var task = compiler.parse(file);
         var parent = new FindTypeDeclarationAt(task.task).scan(task.root, (long) insertPosition);
         var next = nextMember(task, parent);
-        if (next != Position.NONE) {
+        if (next != JavaLanguageServer. Position_NONE) {
             return next;
         }
         return EditHelper.insertAtEndOfClass(task.task, task.root, parent);
@@ -78,6 +77,6 @@ public class OverrideInheritedMethod implements Rewrite {
                 return new Position(line - 1, 0);
             }
         }
-        return Position.NONE;
+        return JavaLanguageServer.Position_NONE;
     }
 }

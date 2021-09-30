@@ -8,6 +8,7 @@ import com.sun.source.util.Trees;
 import java.io.IOException;
 
 public class PruneMethodBodies extends TreeScanner<StringBuilder, Long> {
+    
     private final JavacTask task;
     private final StringBuilder buf = new StringBuilder();
     private CompilationUnitTree root;

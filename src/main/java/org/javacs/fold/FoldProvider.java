@@ -6,9 +6,12 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+
+import org.eclipse.lsp4j.FoldingRange;
+import org.eclipse.lsp4j.FoldingRangeKind;
+import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 import org.javacs.CompilerProvider;
 import org.javacs.ParseTask;
-import org.javacs.lsp.*;
 
 public class FoldProvider {
 
@@ -18,8 +21,9 @@ public class FoldProvider {
         this.compiler = compiler;
     }
 
-    public List<FoldingRange> foldingRanges(Path file) {
+    public List<FoldingRange> foldingRanges(CancelChecker checker, Path file) {
         var task = compiler.parse(file);
+        checker.checkCanceled();
         var imports = new ArrayList<TreePath>();
         var blocks = new ArrayList<TreePath>();
         // TODO find comment trees
@@ -27,18 +31,21 @@ public class FoldProvider {
         class FindFoldingRanges extends TreePathScanner<Void, Void> {
             @Override
             public Void visitClass(ClassTree t, Void __) {
+                checker.checkCanceled();
                 blocks.add(getCurrentPath());
                 return super.visitClass(t, null);
             }
 
             @Override
             public Void visitBlock(BlockTree t, Void __) {
+                checker.checkCanceled();
                 blocks.add(getCurrentPath());
                 return super.visitBlock(t, null);
             }
 
             @Override
             public Void visitImport(ImportTree t, Void __) {
+                checker.checkCanceled();
                 imports.add(getCurrentPath());
                 return null;
             }
@@ -51,15 +58,15 @@ public class FoldProvider {
         if (!imports.isEmpty()) {
             var merged = asFoldingRange(task, imports.get(0), FoldingRangeKind.Imports);
             for (var i : imports) {
+                checker.checkCanceled();
                 var r = asFoldingRange(task, i, FoldingRangeKind.Imports);
-                if (r.startLine <= merged.endLine + 1) {
-                    merged =
-                            new FoldingRange(
-                                    merged.startLine,
-                                    merged.startCharacter,
-                                    r.endLine,
-                                    r.endCharacter,
-                                    FoldingRangeKind.Imports);
+                if (r.getStartLine() <= merged.getEndLine() + 1) {
+                    merged = new FoldingRange();
+                    merged.setStartCharacter(merged.getStartCharacter());
+                    merged.setStartLine(merged.getStartLine());
+                    merged.setEndLine(r.getEndLine());
+                    merged.setEndCharacter(r.getEndCharacter());
+                    merged.setKind(FoldingRangeKind.Imports);
                 } else {
                     all.add(merged);
                     merged = r;
@@ -70,9 +77,11 @@ public class FoldProvider {
 
         // Convert blocks and comments
         for (var t : blocks) {
+            checker.checkCanceled();
             all.add(asFoldingRange(task, t, FoldingRangeKind.Region));
         }
         for (var t : comments) {
+            checker.checkCanceled();
             all.add(asFoldingRange(task, t, FoldingRangeKind.Region));
         }
 
@@ -112,7 +121,13 @@ public class FoldProvider {
         if (t.getLeaf() instanceof ClassTree || t.getLeaf() instanceof BlockTree) {
             endLine--;
         }
-
-        return new FoldingRange(startLine, startChar, endLine, endChar, kind);
+        
+        var range = new FoldingRange();
+        range.setStartLine(startLine);
+        range.setStartCharacter(startChar);
+        range.setEndLine(endLine);
+        range.setEndCharacter(endChar);
+        range.setKind(kind);
+        return range;
     }
 }

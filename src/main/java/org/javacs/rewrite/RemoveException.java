@@ -11,9 +11,8 @@ import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.DeclaredType;
 import org.javacs.CompilerProvider;
 import org.javacs.FindHelper;
-import org.javacs.lsp.Position;
-import org.javacs.lsp.Range;
-import org.javacs.lsp.TextEdit;
+import org.javacs.JavaLanguageServer;
+import org.eclipse.lsp4j.*;
 
 public class RemoveException implements Rewrite {
     final String className, methodName;
@@ -35,7 +34,7 @@ public class RemoveException implements Rewrite {
             var methodTree = Trees.instance(task.task).getTree(methodElement);
             if (methodTree.getThrows().size() == 1) {
                 var delete = removeEntireThrows(task.task, task.root(), methodTree);
-                if (delete == TextEdit.NONE) return CANCELLED;
+                if (delete == JavaLanguageServer.TextEdit_NONE) return CANCELLED;
                 TextEdit[] edits = {delete};
                 return Map.of(file, edits);
             }
@@ -58,7 +57,7 @@ public class RemoveException implements Rewrite {
         }
         var matcher = THROWS.matcher(contents);
         if (!matcher.find(startMethod)) {
-            return TextEdit.NONE;
+            return JavaLanguageServer.TextEdit_NONE;
         }
         var lines = root.getLineMap();
         var start = matcher.start();
@@ -75,7 +74,7 @@ public class RemoveException implements Rewrite {
 
     private TextEdit removeSingleException(JavacTask task, CompilationUnitTree root, MethodTree method) {
         var i = findNamedException(task, root, method);
-        if (i == -1) return TextEdit.NONE;
+        if (i == -1) return JavaLanguageServer.TextEdit_NONE;
         var trees = Trees.instance(task);
         var pos = trees.getSourcePositions();
         var exn = method.getThrows().get(i);

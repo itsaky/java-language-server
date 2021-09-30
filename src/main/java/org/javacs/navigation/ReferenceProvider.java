@@ -5,10 +5,12 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import javax.lang.model.element.TypeElement;
+
+import org.eclipse.lsp4j.Location;
+import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 import org.javacs.CompileTask;
 import org.javacs.CompilerProvider;
 import org.javacs.FindHelper;
-import org.javacs.lsp.Location;
 
 public class ReferenceProvider {
     private final CompilerProvider compiler;
@@ -24,17 +26,19 @@ public class ReferenceProvider {
         this.column = column;
     }
 
-    public List<Location> find() {
+    public List<Location> find(CancelChecker checker) {
         try (var task = compiler.compile(file)) {
             var element = NavigationHelper.findElement(task, file, line, column);
             if (element == null) return NOT_SUPPORTED;
             if (NavigationHelper.isLocal(element)) {
+                checker.checkCanceled();
                 return findReferences(task);
             }
             if (NavigationHelper.isType(element)) {
                 var type = (TypeElement) element;
                 var className = type.getQualifiedName().toString();
                 task.close();
+                checker.checkCanceled();
                 return findTypeReferences(className);
             }
             if (NavigationHelper.isMember(element)) {
@@ -45,6 +49,7 @@ public class ReferenceProvider {
                     memberName = parentClass.getSimpleName().toString();
                 }
                 task.close();
+                checker.checkCanceled();
                 return findMemberReferences(className, memberName);
             }
             return NOT_SUPPORTED;

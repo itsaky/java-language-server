@@ -8,10 +8,8 @@ import java.time.Instant;
 import java.util.*;
 import java.util.logging.Logger;
 import javax.lang.model.element.TypeElement;
-import org.javacs.lsp.DidChangeTextDocumentParams;
-import org.javacs.lsp.DidCloseTextDocumentParams;
-import org.javacs.lsp.DidOpenTextDocumentParams;
-import org.javacs.lsp.TextDocumentContentChangeEvent;
+
+import org.eclipse.lsp4j.*;
 
 public class FileStore {
 
@@ -138,7 +136,10 @@ public class FileStore {
             readInfoFromDisk(file);
         }
         // Look up modified time from cache
-        return javaSources.get(file).modified;
+        var source = javaSources.get(file);
+        if(source == null ) return Instant.now();
+        
+        return source.modified;
     }
 
     static String packageName(Path file) {
@@ -197,7 +198,7 @@ public class FileStore {
             var packageName = StringSearch.packageName(file);
             javaSources.put(file, new Info(time, packageName));
         } catch (NoSuchFileException e) {
-            LOG.warning(e.getMessage());
+            LOG.warning("No such file[" + file + "]: " + e.getMessage());
             javaSources.remove(file);
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -205,32 +206,32 @@ public class FileStore {
     }
 
     static void open(DidOpenTextDocumentParams params) {
-        if (!isJavaFile(params.textDocument.uri)) return;
-        var document = params.textDocument;
-        var file = Paths.get(document.uri);
-        activeDocuments.put(file, new VersionedContent(document.text, document.version));
+        if (!isJavaFile(URI.create(params.getTextDocument().getUri()))) return;
+        var document = params.getTextDocument();
+        var file = Paths.get(URI.create(document.getUri()));
+        activeDocuments.put(file, new VersionedContent(document.getText(), document.getVersion()));
     }
 
     static void change(DidChangeTextDocumentParams params) {
-        if (!isJavaFile(params.textDocument.uri)) return;
-        var document = params.textDocument;
-        var file = Paths.get(document.uri);
+        if (!isJavaFile(URI.create(params.getTextDocument().getUri()))) return;
+        var document = params.getTextDocument();
+        var file = Paths.get(URI.create(document.getUri()));
         var existing = activeDocuments.get(file);
-        if (document.version <= existing.version) {
-            LOG.warning("Ignored change with version " + document.version + " <= " + existing.version);
+        if (document.getVersion() <= existing.version) {
+            LOG.warning("Ignored change with version " + document.getVersion() + " <= " + existing.version);
             return;
         }
         var newText = existing.content;
-        for (var change : params.contentChanges) {
-            if (change.range == null) newText = change.text;
+        for (var change : params.getContentChanges()) {
+            if (change.getRange() == null) newText = change.getText();
             else newText = patch(newText, change);
         }
-        activeDocuments.put(file, new VersionedContent(newText, document.version));
+        activeDocuments.put(file, new VersionedContent(newText, document.getVersion()));
     }
 
     static void close(DidCloseTextDocumentParams params) {
-        if (!isJavaFile(params.textDocument.uri)) return;
-        var file = Paths.get(params.textDocument.uri);
+        if (!isJavaFile(URI.create(params.getTextDocument().getUri()))) return;
+        var file = Paths.get(URI.create(params.getTextDocument().getUri()));
         activeDocuments.remove(file);
     }
 
@@ -248,7 +249,7 @@ public class FileStore {
         try {
             return Files.readString(file);
         } catch (NoSuchFileException e) {
-            LOG.warning(e.getMessage());
+            LOG.warning("No such file[" + file + "]: " + e.getMessage());
             return "";
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -256,9 +257,8 @@ public class FileStore {
     }
 
     static InputStream inputStream(Path file) {
-        var uri = file.toUri();
-        if (activeDocuments.containsKey(uri)) {
-            var string = activeDocuments.get(uri).content;
+        if (activeDocuments.containsKey(file)) {
+            var string = activeDocuments.get(file).content;
             var bytes = string.getBytes();
             return new ByteArrayInputStream(bytes);
         }
@@ -309,28 +309,28 @@ public class FileStore {
 
     private static String patch(String sourceText, TextDocumentContentChangeEvent change) {
         try {
-            var range = change.range;
+            var range = change.getRange();
             var reader = new BufferedReader(new StringReader(sourceText));
             var writer = new StringWriter();
 
             // Skip unchanged lines
             int line = 0;
 
-            while (line < range.start.line) {
+            while (line < range.getStart().getLine()) {
                 writer.write(reader.readLine() + '\n');
                 line++;
             }
 
             // Skip unchanged chars
-            for (int character = 0; character < range.start.character; character++) {
+            for (int character = 0; character < range.getStart().getCharacter(); character++) {
                 writer.write(reader.read());
             }
 
             // Write replacement text
-            writer.write(change.text);
+            writer.write(change.getText());
 
             // Skip replaced text
-            reader.skip(change.rangeLength);
+            reader.skip(change.getRangeLength());
 
             // Write remaining text
             while (true) {

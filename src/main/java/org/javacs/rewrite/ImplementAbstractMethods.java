@@ -15,8 +15,7 @@ import javax.lang.model.type.ExecutableType;
 import org.javacs.CompileTask;
 import org.javacs.CompilerProvider;
 import org.javacs.FindHelper;
-import org.javacs.lsp.Range;
-import org.javacs.lsp.TextEdit;
+import org.eclipse.lsp4j.*;
 
 public class ImplementAbstractMethods implements Rewrite {
     final String className;

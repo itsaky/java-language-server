@@ -15,6 +15,18 @@
             <url>file://${basedir}/dist</url>
         </repository>
     </distributionManagement>
+    
+    <dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>org.junit</groupId>
+				<artifactId>junit-bom</artifactId>
+				<version>5.8.1</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
 
     <dependencies>
         <!-- JSON support -->
@@ -29,13 +41,19 @@
             <artifactId>protobuf-java</artifactId>
             <version>3.9.1</version>
         </dependency>
+        <!-- LSP4J support -->
+        <dependency>
+    		<groupId>org.eclipse.lsp4j</groupId>
+    		<artifactId>org.eclipse.lsp4j</artifactId>
+    		<version>0.12.0</version>
+		</dependency>
+
         <!-- Testing framework -->
         <dependency>
-            <groupId>junit</groupId>
-            <artifactId>junit</artifactId>
-            <version>4.12</version>
-            <scope>test</scope>
-        </dependency>
+			<groupId>org.junit.jupiter</groupId>
+			<artifactId>junit-jupiter</artifactId>
+			<scope>test</scope>
+		</dependency>
         <dependency>
             <groupId>org.hamcrest</groupId>
             <artifactId>hamcrest-all</artifactId>
@@ -58,7 +76,6 @@
     </dependencies>
     <build>
         <plugins>
-            <!-- Set source 1.10 -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
@@ -92,45 +109,36 @@
                     </annotationProcessorPaths>
                 </configuration>
             </plugin>
-            <!-- Copy dependencies to dist -->
+            <!-- Package as single jar -->
             <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-dependency-plugin</artifactId>
-                <version>3.1.1</version>
-                <executions>
-                <execution>
-                    <id>copy-dependencies</id>
-                    <phase>package</phase>
-                    <goals>
-                    <goal>copy-dependencies</goal>
-                    </goals>
-                    <configuration>
-                    <includeScope>runtime</includeScope>
-                    <outputDirectory>${project.basedir}/dist/classpath</outputDirectory>
-                    <overWriteReleases>false</overWriteReleases>
-                    <overWriteSnapshots>false</overWriteSnapshots>
-                    <overWriteIfNewer>true</overWriteIfNewer>
-                    </configuration>
-                </execution>
-                </executions>
+            	<artifactId>maven-assembly-plugin</artifactId>
+            	<executions>
+            		<execution>
+            			<phase>package</phase>
+            			<goals>
+            				<goal>single</goal>
+            			</goals>
+            		</execution>
+            	</executions>
+            	<configuration>
+            		<descriptorRefs>
+            			<descriptorRef>jar-with-dependencies</descriptorRef>
+            		</descriptorRefs>
+            		<outputDirectory>${project.basedir}/dist/classpath</outputDirectory>
+            		<finalName>jls</finalName>
+            		<archive>
+            			<manifest>
+            				<mainClass>
+            					org.javacs.Main
+            				</mainClass>
+            			</manifest>
+            		</archive>
+            	</configuration>
             </plugin>
-            <!-- Copy output jar to dist -->
             <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-jar-plugin</artifactId>
-                <version>2.3.1</version>
-                <configuration>
-                <outputDirectory>${project.basedir}/dist/classpath</outputDirectory>
-                <finalName>java-language-server</finalName>
-                	<archive>
-                		<manifest>
-                			<mainClass>
-                				org.javacs.Main
-                			</mainClass>
-                		</manifest>
-                	</archive>
-                </configuration>
-            </plugin>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<version>2.22.2</version>
+			</plugin>
         </plugins>
     </build>
 </project>
