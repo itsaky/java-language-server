@@ -1,16 +1,106 @@
-package org.javacs;
+package org.javacs.services;
 
-import com.sun.source.util.Trees;
-import java.nio.file.Path;
-import java.time.Instant;
-import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import java.net.URI;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
-import java.util.*;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.logging.Logger;
-import javax.lang.model.element.*;
+
+import javax.lang.model.element.Element;
+import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.VariableElement;
+
+import com.google.gson.JsonObject;
+import com.itsaky.lsp.SemanticHighlight;
+import com.itsaky.lsp.SemanticHighlightsParams;
+import com.itsaky.lsp.services.IDELanguageClient;
+import com.itsaky.lsp.services.IDELanguageClientAware;
+import com.itsaky.lsp.services.IDELanguageServer;
+import com.itsaky.lsp.services.IDETextDocumentService;
+import com.itsaky.lsp.services.IDEWorkspaceService;
+import com.sun.source.util.Trees;
+
+import org.eclipse.lsp4j.CodeAction;
+import org.eclipse.lsp4j.CodeActionParams;
+import org.eclipse.lsp4j.CodeLens;
+import org.eclipse.lsp4j.CodeLensOptions;
+import org.eclipse.lsp4j.CodeLensParams;
+import org.eclipse.lsp4j.Command;
+import org.eclipse.lsp4j.CompletionItem;
+import org.eclipse.lsp4j.CompletionList;
+import org.eclipse.lsp4j.CompletionOptions;
+import org.eclipse.lsp4j.CompletionParams;
+import org.eclipse.lsp4j.DefinitionParams;
+import org.eclipse.lsp4j.DidChangeConfigurationParams;
+import org.eclipse.lsp4j.DidChangeTextDocumentParams;
+import org.eclipse.lsp4j.DidChangeWatchedFilesParams;
+import org.eclipse.lsp4j.DidCloseTextDocumentParams;
+import org.eclipse.lsp4j.DidOpenTextDocumentParams;
+import org.eclipse.lsp4j.DidSaveTextDocumentParams;
+import org.eclipse.lsp4j.DocumentFormattingParams;
+import org.eclipse.lsp4j.DocumentLinkOptions;
+import org.eclipse.lsp4j.DocumentOnTypeFormattingOptions;
+import org.eclipse.lsp4j.DocumentSymbol;
+import org.eclipse.lsp4j.DocumentSymbolParams;
+import org.eclipse.lsp4j.ExecuteCommandOptions;
+import org.eclipse.lsp4j.FileOperationFilter;
+import org.eclipse.lsp4j.FileOperationOptions;
+import org.eclipse.lsp4j.FileOperationPattern;
+import org.eclipse.lsp4j.FileOperationsServerCapabilities;
+import org.eclipse.lsp4j.FoldingRange;
+import org.eclipse.lsp4j.FoldingRangeRequestParams;
+import org.eclipse.lsp4j.Hover;
+import org.eclipse.lsp4j.HoverParams;
+import org.eclipse.lsp4j.InitializeParams;
+import org.eclipse.lsp4j.InitializeResult;
+import org.eclipse.lsp4j.InitializedParams;
+import org.eclipse.lsp4j.Location;
+import org.eclipse.lsp4j.LocationLink;
+import org.eclipse.lsp4j.Position;
+import org.eclipse.lsp4j.PrepareRenameParams;
+import org.eclipse.lsp4j.PrepareRenameResult;
+import org.eclipse.lsp4j.PublishDiagnosticsParams;
+import org.eclipse.lsp4j.Range;
+import org.eclipse.lsp4j.ReferenceParams;
+import org.eclipse.lsp4j.Registration;
+import org.eclipse.lsp4j.RegistrationParams;
+import org.eclipse.lsp4j.RenameParams;
+import org.eclipse.lsp4j.SaveOptions;
+import org.eclipse.lsp4j.ServerCapabilities;
+import org.eclipse.lsp4j.SignatureHelp;
+import org.eclipse.lsp4j.SignatureHelpOptions;
+import org.eclipse.lsp4j.SignatureHelpParams;
+import org.eclipse.lsp4j.SymbolInformation;
+import org.eclipse.lsp4j.TextDocumentSyncKind;
+import org.eclipse.lsp4j.TextDocumentSyncOptions;
+import org.eclipse.lsp4j.TextEdit;
+import org.eclipse.lsp4j.WorkDoneProgressCancelParams;
+import org.eclipse.lsp4j.WorkspaceEdit;
+import org.eclipse.lsp4j.WorkspaceFoldersOptions;
+import org.eclipse.lsp4j.WorkspaceServerCapabilities;
+import org.eclipse.lsp4j.WorkspaceSymbolParams;
+import org.eclipse.lsp4j.jsonrpc.CompletableFutures;
+import org.eclipse.lsp4j.jsonrpc.messages.Either;
+import org.javacs.CompileTask;
+import org.javacs.CompilerProvider;
+import org.javacs.CrashHandler;
+import org.javacs.FileStore;
+import org.javacs.FindHelper;
+import org.javacs.FindNameAt;
+import org.javacs.JavaCompilerService;
+import org.javacs.JsonHelper;
+import org.javacs.Main;
 import org.javacs.action.CodeActionProvider;
 import org.javacs.completion.CompletionProvider;
 import org.javacs.completion.SignatureProvider;
@@ -21,20 +111,17 @@ import org.javacs.lens.CodeLensProvider;
 import org.javacs.markup.ErrorProvider;
 import org.javacs.navigation.DefinitionProvider;
 import org.javacs.navigation.ReferenceProvider;
-import org.javacs.rewrite.*;
-import com.google.gson.JsonObject;
-import org.eclipse.lsp4j.*;
-import org.eclipse.lsp4j.jsonrpc.CompletableFutures;
-import org.eclipse.lsp4j.jsonrpc.messages.Either;
-import org.eclipse.lsp4j.services.LanguageClient;
-import org.eclipse.lsp4j.services.LanguageClientAware;
-import org.eclipse.lsp4j.services.LanguageServer;
-import org.eclipse.lsp4j.services.TextDocumentService;
-import org.eclipse.lsp4j.services.WorkspaceService;
+import org.javacs.rewrite.AutoAddOverrides;
+import org.javacs.rewrite.AutoFixImports;
+import org.javacs.rewrite.RenameField;
+import org.javacs.rewrite.RenameMethod;
+import org.javacs.rewrite.RenameVariable;
+import org.javacs.rewrite.Rewrite;
+import org.javacs.semantics.SemanticHighlightProvider;
 
-public class JavaLanguageServer implements LanguageServer, LanguageClientAware, TextDocumentService, WorkspaceService {
+public class JavaLanguageServer implements IDELanguageServer, IDELanguageClientAware, IDETextDocumentService, IDEWorkspaceService {
 	
-	private LanguageClient client;
+	private IDELanguageClient client;
 	private JavaCompilerService cacheCompiler;
 	private JsonObject cacheSettings;
 	private JsonObject settings = new JsonObject();
@@ -42,8 +129,16 @@ public class JavaLanguageServer implements LanguageServer, LanguageClientAware, 
 	private boolean uncheckedChanges = false;
     private Path lastEdited = Paths.get("");
 	
+	private final DocumentChangeHandler changeHandler;
+	private final Thread changeHandlerThread;
 	private static final Logger LOG = Logger.getLogger("main");
-
+	
+	public JavaLanguageServer () {
+		this.changeHandler = new DocumentChangeHandler();
+		this.changeHandlerThread = new Thread(changeHandler);
+		this.changeHandlerThread.setDaemon(true);
+	}
+	
 	JavaCompilerService compiler() {
 		if (needsCompiler()) {
 			cacheCompiler = createCompiler();
@@ -70,13 +165,27 @@ public class JavaLanguageServer implements LanguageServer, LanguageClientAware, 
 		var started = Instant.now();
 		try (var task = compiler().compile(files.toArray(Path[]::new))) {
 			var compiled = Instant.now();
-			LOG.info("...compiled in " + Duration.between(started, compiled).toMillis() + " ms");
-			for (var errs : new ErrorProvider(compiler(), task).errors()) {
-				client.publishDiagnostics(errs);
+			
+			// Provide errors
+			try {
+				LOG.info("...compiled in " + Duration.between(started, compiled).toMillis() + " ms");
+				for (var errs : new ErrorProvider(compiler(), task).errors()) {
+					client.publishDiagnostics(errs);
+				}
+				var published = Instant.now();
+				LOG.info("...published in " + Duration.between(started, published).toMillis() + " ms");
+			} catch (Throwable th) {
+				CrashHandler.logCrash(th);
 			}
-			// TODO respond to semantic colors request
-			var published = Instant.now();
-			LOG.info("...published in " + Duration.between(started, published).toMillis() + " ms");
+			
+			// Provide semantic syntax highlights
+			try {
+				for(var highlight : new SemanticHighlightProvider(task).highlights()) {
+					client.semanticHighlights(highlight);
+				}
+			} catch (Throwable th) {
+				CrashHandler.logCrash(th);
+			}
 		}
 	}
 
@@ -191,7 +300,7 @@ public class JavaLanguageServer implements LanguageServer, LanguageClientAware, 
 		options.setTriggerCharacters(List.of("."));
 		return options;
 	}
-	
+
 	private boolean canRename(Element rename) {
         switch (rename.getKind()) {
             case METHOD:
@@ -266,9 +375,9 @@ public class JavaLanguageServer implements LanguageServer, LanguageClientAware, 
         return canFindSource(rename.getEnclosingElement());
     }
     
-	public void doAsyncWork() {
-        if (uncheckedChanges && FileStore.activeDocuments().contains(lastEdited)) {
-            lint(List.of(lastEdited));
+	public void doAsyncWork(boolean lintAllOpened) {
+        if (lintAllOpened || (uncheckedChanges && FileStore.activeDocuments().contains(lastEdited))) {
+            lint(lintAllOpened ? FileStore.activeDocuments() : List.of(lastEdited));
             uncheckedChanges = false;
         }
     }
@@ -293,11 +402,17 @@ public class JavaLanguageServer implements LanguageServer, LanguageClientAware, 
 	@Override
 	public void initialized(InitializedParams params) {
 		client.registerCapability(registerClientCapabilities());
+		
+		// Start the change handler thread once server
+		// has been initialized
+		
+		changeHandlerThread.start();
+		
 		LOG.info("Server initialized");
 	}
 	
 	@Override
-	public void connect(LanguageClient client) {
+	public void connect(IDELanguageClient client) {
 		this.client = client;
 	}
 
@@ -308,16 +423,17 @@ public class JavaLanguageServer implements LanguageServer, LanguageClientAware, 
 
 	@Override
 	public void exit() {
+		changeHandler.stop();
 		Main.exit();
 	}
 
 	@Override
-	public TextDocumentService getTextDocumentService() {
+	public IDETextDocumentService getTextDocumentService() {
 		return this;
 	}
 
 	@Override
-	public WorkspaceService getWorkspaceService() {
+	public IDEWorkspaceService getWorkspaceService() {
 		return this;
 	}
 
@@ -389,14 +505,13 @@ public class JavaLanguageServer implements LanguageServer, LanguageClientAware, 
 		if (!FileStore.isJavaFile(URI.create(params.getTextDocument().getUri()))) {
 		      throw new IllegalArgumentException("File must be Java file");
 		};
-        var file = Paths.get(params.getTextDocument().getUri());
+        var file = Paths.get(URI.create(params.getTextDocument().getUri()));
         var task = compiler().parse(file);
         return CompletableFuture.completedFuture(CodeLensProvider.find(task));
 	}
 
 	@Override
 	public CompletableFuture<Either<List<CompletionItem>, CompletionList>> completion(CompletionParams params) {
-		LOG.info("Calculating completions");
 		return CompletableFutures.computeAsync(checker -> {
 			var file = Paths.get(URI.create(params.getTextDocument().getUri()));
         	var provider = new CompletionProvider(compiler());
@@ -422,6 +537,10 @@ public class JavaLanguageServer implements LanguageServer, LanguageClientAware, 
 		var java = JsonHelper.GSON.toJsonTree(change.getSettings()).getAsJsonObject().get("java");
         LOG.info("Received java settings " + java);
         settings = java.getAsJsonObject();
+        
+        changeHandler.pause();
+        doAsyncWork(true);
+        changeHandler.resume();
 	}
 	
 	@Override
@@ -500,12 +619,13 @@ public class JavaLanguageServer implements LanguageServer, LanguageClientAware, 
 		if (!FileStore.isJavaFile(URI.create(position.getTextDocument().getUri()))) {
 		      throw new IllegalArgumentException("File must be a Java file");
 		}
-        var file = Paths.get(position.getTextDocument().getUri());
+        var file = Paths.get(URI.create(position.getTextDocument().getUri()));
         var line = position.getPosition().getLine() + 1;
         var column = position.getPosition().getCharacter() + 1;
         var provider = new DefinitionProvider(compiler(), file, line, column);
         return CompletableFutures.computeAsync(checker -> {
-        	return Either.forLeft(provider.find(checker));
+        	var found = provider.find(checker);
+        	return Either.forLeft(found);
         });
 	}
 	
@@ -514,7 +634,7 @@ public class JavaLanguageServer implements LanguageServer, LanguageClientAware, 
 		if (!FileStore.isJavaFile(URI.create(position.getTextDocument().getUri()))) {
 		      throw new IllegalArgumentException("File must be a Java file");
 		}
-        var file = Paths.get(position.getTextDocument().getUri());
+        var file = Paths.get(URI.create(position.getTextDocument().getUri()));
         var line = position.getPosition().getLine() + 1;
         var column = position.getPosition().getCharacter() + 1;
         var provider = new ReferenceProvider(compiler(), file, line, column);
@@ -526,7 +646,7 @@ public class JavaLanguageServer implements LanguageServer, LanguageClientAware, 
 	@Override
 	public CompletableFuture<List<Either<SymbolInformation, DocumentSymbol>>> documentSymbol(DocumentSymbolParams params) {
 		if (!FileStore.isJavaFile(URI.create(params.getTextDocument().getUri()))) return CompletableFuture.completedFuture(null);
-        var file = Paths.get(params.getTextDocument().getUri());
+        var file = Paths.get(URI.create(params.getTextDocument().getUri()));
         var provider = new SymbolProvider(compiler());
         return CompletableFutures.computeAsync(checker -> {
         	return provider.documentSymbols(checker, file);
@@ -536,7 +656,7 @@ public class JavaLanguageServer implements LanguageServer, LanguageClientAware, 
 	@Override
 	public CompletableFuture<List<FoldingRange>> foldingRange(FoldingRangeRequestParams params) {
 		if (!FileStore.isJavaFile(URI.create(params.getTextDocument().getUri()))) return CompletableFuture.completedFuture(List.of());
-        var file = Paths.get(params.getTextDocument().getUri());
+        var file = Paths.get(URI.create(params.getTextDocument().getUri()));
         var provider = new FoldProvider(compiler());
         
         return CompletableFutures.computeAsync(checker -> {
@@ -615,7 +735,6 @@ public class JavaLanguageServer implements LanguageServer, LanguageClientAware, 
 	
 	@Override
 	public void didChange(DidChangeTextDocumentParams params) {
-		LOG.info("textDocument/didChange");
 		FileStore.change(params);
         lastEdited = Paths.get(URI.create(params.getTextDocument().getUri()));
         uncheckedChanges = true;
@@ -623,7 +742,6 @@ public class JavaLanguageServer implements LanguageServer, LanguageClientAware, 
 
 	@Override
 	public void didClose(DidCloseTextDocumentParams params) {
-		LOG.info("textDocument/didClose");
 		FileStore.close(params);
         if (FileStore.isJavaFile(URI.create(params.getTextDocument().getUri()))) {
             client.publishDiagnostics(new PublishDiagnosticsParams(params.getTextDocument().getUri(), List.of()));
@@ -632,19 +750,68 @@ public class JavaLanguageServer implements LanguageServer, LanguageClientAware, 
 
 	@Override
 	public void didOpen(DidOpenTextDocumentParams params) {
-		LOG.info("textDocument/didOpen");
 		FileStore.open(params);
         if (!FileStore.isJavaFile(URI.create(params.getTextDocument().getUri()))) return;
         lastEdited = Paths.get(URI.create(params.getTextDocument().getUri()));
         uncheckedChanges = true;
+        
+        this.changeHandler.setLastChanged(System.currentTimeMillis());
 	}
 
 	@Override
 	public void didSave(DidSaveTextDocumentParams params) {
-		LOG.info("textDocument/didSave");
 		if (FileStore.isJavaFile(URI.create(params.getTextDocument().getUri()))) {
             lint(FileStore.activeDocuments());
         }
+	}
+	
+	@Override
+	public CompletableFuture<List<SemanticHighlight>> semanticHighlights(SemanticHighlightsParams params) {
+		return CompletableFutures.computeAsync(checker -> {
+			var file = Paths.get(URI.create(params.getDocument().getUri()));
+			if(!FileStore.isJavaFile(file)) {
+				throw new IllegalArgumentException("File is not a java file");
+			}
+			try (var task = compiler().compile(file)) {
+				var provider = new SemanticHighlightProvider(task);
+				return provider.highlights();
+			}
+		});
+	}
+	
+	class DocumentChangeHandler implements Runnable {
+		
+		private long lastChanged;
+		private boolean stopped = false;
+		private boolean paused = false;
+		
+		public void setLastChanged(long changed) {
+			this.lastChanged = changed;
+		}
+		
+		public void stop() {
+			this.stopped = true;
+		}
+		
+		public void pause() {
+			this.paused = true;
+		}
+		
+		public void resume() {
+			this.paused = false;
+		}
+		
+		@Override
+		public void run() {
+			while (!stopped && !paused) {
+				if((System.currentTimeMillis() - lastChanged) >= 150) {
+					doAsyncWork(false);
+					try {
+						Thread.sleep(100);
+					} catch (InterruptedException e) {}
+				}
+			}
+		}
 	}
 	
 	public static final Position Position_NONE = new Position(-1, -1);

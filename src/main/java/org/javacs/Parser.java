@@ -17,7 +17,7 @@ import javax.lang.model.element.*;
 import javax.tools.JavaCompiler;
 import javax.tools.JavaFileObject;
 
-import static org.javacs.JavaLanguageServer.Range_NONE;
+import static org.javacs.services.JavaLanguageServer.Range_NONE;
 
 class Parser {
     private static final JavaCompiler COMPILER = ServiceLoader.load(JavaCompiler.class).iterator().next();

@@ -26,7 +26,7 @@ public class CrashHandler {
     	client.logMessage(params);
     }
     
-    private static String createStacktrace(Throwable th) {
+    public static String createStacktrace(Throwable th) {
     	var r = new StringWriter();
     	th.printStackTrace(new PrintWriter(r));
 		return r.toString();

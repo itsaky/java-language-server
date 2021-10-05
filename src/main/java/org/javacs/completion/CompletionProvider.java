@@ -772,6 +772,7 @@ public class CompletionProvider {
         i.setKind(CompletionItemKind.Keyword);
         i.setDetail("keyword");
         i.setSortText( String.format("%02d%s", Priority.KEYWORD, i.getLabel()));
+        i.setInsertText(keyword.concat(" "));
         return i;
     }
 

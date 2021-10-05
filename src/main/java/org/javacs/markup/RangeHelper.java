@@ -5,8 +5,8 @@ import com.sun.source.tree.CompilationUnitTree;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 
-class RangeHelper {
-    static Range range(CompilationUnitTree root, long start, long end) {
+public class RangeHelper {
+    public static Range range(CompilationUnitTree root, long start, long end) {
         var lines = root.getLineMap();
         var startLine = (int) lines.getLineNumber(start);
         var startColumn = (int) lines.getColumnNumber(start);

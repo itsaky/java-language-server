@@ -1,31 +1,28 @@
-package org.javacs.markup;
+package org.javacs.semantics;
 
+import com.itsaky.lsp.SemanticHighlight;
 import com.sun.source.tree.*;
 import com.sun.source.util.*;
 import java.nio.file.Paths;
+import java.util.logging.Logger;
+
 import javax.lang.model.element.*;
+
+import org.eclipse.lsp4j.Range;
 import org.javacs.FileStore;
-import org.eclipse.lsp4j.*;
+import org.javacs.markup.RangeHelper;
 
 import static javax.lang.model.element.ElementKind.*;
-import static org.javacs.JavaLanguageServer.Range_NONE;
+import static org.javacs.services.JavaLanguageServer.*;
 
-class Colorizer extends TreePathScanner<Void, SemanticColors> {
+class SemanticHighlighter extends TreePathScanner<Void, SemanticHighlight> {
     private final Trees trees;
 
-    Colorizer(JavacTask task) {
+    SemanticHighlighter(JavacTask task) {
         trees = Trees.instance(task);
     }
     
-    private void packageDeclaration (CompilationUnitTree unit, Tree tree, SemanticColors colors) {
-    	var pos = trees.getSourcePositions();
-    	var start = pos.getStartPosition(unit, tree);
-    	var end = pos.getEndPosition(unit, tree);
-    	var range = RangeHelper.range(unit, start, end);
-    	colors.packages.add(range);
-    }
-
-    private void maybeField(Name name, SemanticColors colors) {
+    private void putSemantics(Name name, SemanticHighlight colors) {
         if (name.contentEquals("this") || name.contentEquals("super") || name.contentEquals("class")) {
             return;
         }
@@ -80,6 +77,11 @@ class Colorizer extends TreePathScanner<Void, SemanticColors> {
             return;
         }
         
+        if(kind == METHOD) {
+        	colors.methodDeclarations.add(range);
+        	return;
+        }
+        
         if(kind == PARAMETER) {
             colors.parameters.add(range);
             return;
@@ -92,11 +94,6 @@ class Colorizer extends TreePathScanner<Void, SemanticColors> {
         
         if(kind == EXCEPTION_PARAMETER) {
             colors.exceptionParams.add(range);
-            return;
-        }
-        
-        if(kind == METHOD) {
-            colors.methods.add(range);
             return;
         }
         
@@ -153,35 +150,56 @@ class Colorizer extends TreePathScanner<Void, SemanticColors> {
         end = start + name.length();
         return RangeHelper.range(root, start, end);
     }
-    
-    @Override
-    public Void visitCompilationUnit(CompilationUnitTree tree, SemanticColors colors) {
-    	var pkg = tree.getPackage().getPackageName();
-    	packageDeclaration(tree, pkg, colors);
-    	return super.visitCompilationUnit(tree, colors);
-    }
 
     @Override
-    public Void visitIdentifier(IdentifierTree t, SemanticColors colors) {
-        maybeField(t.getName(), colors);
+    public Void visitIdentifier(IdentifierTree t, SemanticHighlight colors) {
+        putSemantics(t.getName(), colors);
         return super.visitIdentifier(t, colors);
     }
 
     @Override
-    public Void visitMemberSelect(MemberSelectTree t, SemanticColors colors) {
-        maybeField(t.getIdentifier(), colors);
+    public Void visitMemberSelect(MemberSelectTree t, SemanticHighlight colors) {
+        putSemantics(t.getIdentifier(), colors);
         return super.visitMemberSelect(t, colors);
     }
 
     @Override
-    public Void visitVariable(VariableTree t, SemanticColors colors) {
-        maybeField(t.getName(), colors);
+    public Void visitVariable(VariableTree t, SemanticHighlight colors) {
+        putSemantics(t.getName(), colors);
         return super.visitVariable(t, colors);
     }
 
     @Override
-    public Void visitClass(ClassTree t, SemanticColors colors) {
-        maybeField(t.getSimpleName(), colors);
+    public Void visitClass(ClassTree t, SemanticHighlight colors) {
+        putSemantics(t.getSimpleName(), colors);
         return super.visitClass(t, colors);
     }
+    
+    @Override
+    public Void visitMethodInvocation (MethodInvocationTree tree, SemanticHighlight colors) {
+    	Name name = null;
+    	var select = tree.getMethodSelect();
+    	if(select instanceof MemberSelectTree) {
+    		name = ((MemberSelectTree) select).getIdentifier();
+    	} else if(select instanceof IdentifierTree) {
+    		name = ((IdentifierTree) select).getName();
+    	}
+    	
+    	if(name != null) {
+    		var range = find(getCurrentPath(), name);
+    		if(range != null) {
+    			colors.methodInvocations.add(range);
+    		}
+    	}
+		return super.visitMethodInvocation(tree, colors);
+    	
+    }
+    
+    @Override
+    public Void visitMethod(MethodTree tree, SemanticHighlight colors) {
+    	putSemantics(tree.getName(), colors);
+		return super.visitMethod(tree, colors);
+	}
+    
+    private static final Logger LOG = Logger.getLogger("main");
 }

@@ -11,7 +11,7 @@ import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.DeclaredType;
 import org.javacs.CompilerProvider;
 import org.javacs.FindHelper;
-import org.javacs.JavaLanguageServer;
+import org.javacs.services.JavaLanguageServer;
 import org.eclipse.lsp4j.*;
 
 public class RemoveException implements Rewrite {

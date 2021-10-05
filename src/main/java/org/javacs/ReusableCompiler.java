@@ -83,6 +83,8 @@ class ReusableCompiler {
     
     private List<String> currentOptions = new ArrayList<>();
     private ReusableContext currentContext;
+    
+    private Borrow lastBorrow;
 
     /**
      * Creates a new task as if by {@link javax.tools.JavaCompiler#getTask} and runs the provided worker with it. The
@@ -110,7 +112,14 @@ class ReusableCompiler {
         
         List<String> opts =
                 StreamSupport.stream(options.spliterator(), false).collect(Collectors.toCollection(ArrayList::new));
-        if (!opts.equals(currentOptions)) {
+                
+        if(lastBorrow != null && !lastBorrow.closed) {
+               try {
+               	lastBorrow.close();
+               } catch (Throwable th) {}
+        }
+               
+        if (!opts.equals(currentOptions)) {	
             LOG.warning(String.format("Options changed from %s to %s, creating new compiler", options, opts));
             currentOptions = opts;
             currentContext = new ReusableContext(opts);
@@ -122,7 +131,7 @@ class ReusableCompiler {
 
         task.addTaskListener(currentContext);
         
-        return new Borrow(task, currentContext);
+        return lastBorrow = new Borrow(task, currentContext);
     }
 
     class Borrow implements AutoCloseable {

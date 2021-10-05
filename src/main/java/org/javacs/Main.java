@@ -5,9 +5,12 @@ import java.util.concurrent.Future;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import com.itsaky.lsp.services.IDELanguageClient;
+
 import org.eclipse.lsp4j.jsonrpc.Launcher;
-import org.eclipse.lsp4j.launch.LSPLauncher;
 import org.eclipse.lsp4j.services.LanguageClient;
+import org.javacs.launch.JLSLauncher;
+import org.javacs.services.JavaLanguageServer;
 
 public class Main {
 	
@@ -37,7 +40,7 @@ public class Main {
 			
 			var languageServer = new JavaLanguageServer();
 			var provider = ConnectionFactory.getConnectionProvider();
-			Launcher<LanguageClient> server = LSPLauncher.createServerLauncher(languageServer, provider.getInputStream(), provider.getOutputStream());
+			Launcher<IDELanguageClient> server = JLSLauncher.createServerLauncher(languageServer, provider.getInputStream(), provider.getOutputStream());
 			listening = server.startListening();
 			var client = server.getRemoteProxy();
 			languageServer.connect(client);

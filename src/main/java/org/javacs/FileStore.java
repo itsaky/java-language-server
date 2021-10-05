@@ -31,7 +31,7 @@ public class FileStore {
         }
     }
 
-    static void setWorkspaceRoots(Set<Path> newRoots) {
+    public static void setWorkspaceRoots(Set<Path> newRoots) {
         newRoots = normalize(newRoots);
         for (var root : workspaceRoots) {
             if (!newRoots.contains(root)) {
@@ -63,7 +63,7 @@ public class FileStore {
         }
     }
 
-    static class FindJavaSources extends SimpleFileVisitor<Path> {
+    public static class FindJavaSources extends SimpleFileVisitor<Path> {
         @Override
         public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
             if (attrs.isSymbolicLink()) {
@@ -82,7 +82,7 @@ public class FileStore {
         }
     }
 
-    static Collection<Path> all() {
+    public static Collection<Path> all() {
         return javaSources.keySet();
     }
 
@@ -122,11 +122,11 @@ public class FileStore {
         return dir;
     }
 
-    static boolean contains(Path file) {
+    public static boolean contains(Path file) {
         return isJavaFile(file) && javaSources.containsKey(file);
     }
 
-    static Instant modified(Path file) {
+    public static Instant modified(Path file) {
         // If file is open, use last in-memory modification time
         if (activeDocuments.containsKey(file)) {
             return activeDocuments.get(file).modified;
@@ -142,7 +142,7 @@ public class FileStore {
         return source.modified;
     }
 
-    static String packageName(Path file) {
+    public static String packageName(Path file) {
         // If we've never checked before, look up package name on disk
         if (!javaSources.containsKey(file)) {
             readInfoFromDisk(file);
@@ -180,15 +180,15 @@ public class FileStore {
         return list;
     }
 
-    static void externalCreate(Path file) {
+    public static void externalCreate(Path file) {
         readInfoFromDisk(file);
     }
 
-    static void externalChange(Path file) {
+    public static void externalChange(Path file) {
         readInfoFromDisk(file);
     }
 
-    static void externalDelete(Path file) {
+    public static void externalDelete(Path file) {
         javaSources.remove(file);
     }
 
@@ -198,21 +198,21 @@ public class FileStore {
             var packageName = StringSearch.packageName(file);
             javaSources.put(file, new Info(time, packageName));
         } catch (NoSuchFileException e) {
-            LOG.warning("No such file[" + file + "]: " + e.getMessage());
+            LOG.warning("No such file[" + file + "]: " + CrashHandler.createStacktrace(e));
             javaSources.remove(file);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
 
-    static void open(DidOpenTextDocumentParams params) {
+    public static void open(DidOpenTextDocumentParams params) {
         if (!isJavaFile(URI.create(params.getTextDocument().getUri()))) return;
         var document = params.getTextDocument();
         var file = Paths.get(URI.create(document.getUri()));
         activeDocuments.put(file, new VersionedContent(document.getText(), document.getVersion()));
     }
 
-    static void change(DidChangeTextDocumentParams params) {
+    public static void change(DidChangeTextDocumentParams params) {
         if (!isJavaFile(URI.create(params.getTextDocument().getUri()))) return;
         var document = params.getTextDocument();
         var file = Paths.get(URI.create(document.getUri()));
@@ -229,13 +229,13 @@ public class FileStore {
         activeDocuments.put(file, new VersionedContent(newText, document.getVersion()));
     }
 
-    static void close(DidCloseTextDocumentParams params) {
+    public static void close(DidCloseTextDocumentParams params) {
         if (!isJavaFile(URI.create(params.getTextDocument().getUri()))) return;
         var file = Paths.get(URI.create(params.getTextDocument().getUri()));
         activeDocuments.remove(file);
     }
 
-    static Set<Path> activeDocuments() {
+    public static Set<Path> activeDocuments() {
         return activeDocuments.keySet();
     }
 
@@ -249,14 +249,14 @@ public class FileStore {
         try {
             return Files.readString(file);
         } catch (NoSuchFileException e) {
-            LOG.warning("No such file[" + file + "]: " + e.getMessage());
+            LOG.warning("No such file[" + file + "]: " + CrashHandler.createStacktrace(e));
             return "";
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
-
-    static InputStream inputStream(Path file) {
+    
+    public static InputStream inputStream(Path file) {
         if (activeDocuments.containsKey(file)) {
             var string = activeDocuments.get(file).content;
             var bytes = string.getBytes();
@@ -273,7 +273,7 @@ public class FileStore {
         }
     }
 
-    static BufferedReader bufferedReader(Path file) {
+    public static BufferedReader bufferedReader(Path file) {
         var uri = file;
         if (activeDocuments.containsKey(uri)) {
             var string = activeDocuments.get(uri).content;
@@ -289,12 +289,12 @@ public class FileStore {
         }
     }
 
-    static BufferedReader lines(Path file) {
+    public static BufferedReader lines(Path file) {
         return bufferedReader(file);
     }
 
     /** Convert from line/column (1-based) to offset (0-based) */
-    static int offset(String contents, int line, int column) {
+    public static int offset(String contents, int line, int column) {
         line--;
         column--;
         int cursor = 0;
@@ -344,7 +344,7 @@ public class FileStore {
         }
     }
 
-    static boolean isJavaFile(Path file) {
+    public static boolean isJavaFile(Path file) {
         var name = file.getFileName().toString();
         // We hide module-info.java from javac, because when javac sees module-info.java
         // it goes into "module mode" and starts looking for classes on the module class path.
@@ -355,11 +355,11 @@ public class FileStore {
         return name.endsWith(".java") && !Files.isDirectory(file) && !name.equals("module-info.java");
     }
 
-    static boolean isJavaFile(URI uri) {
+    public static boolean isJavaFile(URI uri) {
         return uri.getScheme().equals("file") && isJavaFile(Paths.get(uri));
     }
 
-    static Optional<Path> findDeclaringFile(TypeElement el) {
+    public static Optional<Path> findDeclaringFile(TypeElement el) {
         var qualifiedName = el.getQualifiedName().toString();
         var packageName = StringSearch.mostName(qualifiedName);
         var className = StringSearch.lastName(qualifiedName);

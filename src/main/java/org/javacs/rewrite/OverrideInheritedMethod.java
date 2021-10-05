@@ -10,7 +10,7 @@ import javax.lang.model.type.ExecutableType;
 import org.javacs.CompilerProvider;
 import org.javacs.FindHelper;
 import org.javacs.FindTypeDeclarationAt;
-import org.javacs.JavaLanguageServer;
+import org.javacs.services.JavaLanguageServer;
 import org.javacs.ParseTask;
 import org.eclipse.lsp4j.*;
 
