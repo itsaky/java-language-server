@@ -13,7 +13,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
+import java9.util.concurrent.CompletableFuture;
 import java.util.logging.Logger;
 
 import javax.lang.model.element.Element;
@@ -376,10 +376,12 @@ public class JavaLanguageServer implements IDELanguageServer, IDELanguageClientA
     }
     
 	public void doAsyncWork(boolean lintAllOpened) {
-        if (lintAllOpened || (uncheckedChanges && FileStore.activeDocuments().contains(lastEdited))) {
-            lint(lintAllOpened ? FileStore.activeDocuments() : List.of(lastEdited));
-            uncheckedChanges = false;
-        }
+        try {
+        	if (lintAllOpened || (uncheckedChanges && FileStore.activeDocuments().contains(lastEdited))) {
+          	  lint(lintAllOpened ? FileStore.activeDocuments() : List.of(lastEdited));
+        	    uncheckedChanges = false;
+      	  }
+        } catch (Throwable th) {}
     }
     
     private RegistrationParams registerClientCapabilities() {
