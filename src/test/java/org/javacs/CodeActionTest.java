@@ -50,6 +50,9 @@ public class CodeActionTest extends BaseTest {
 	
 	static List<String> quickFix (String file) throws InterruptedException, ExecutionException {
 		
+		// Clear any diagnostics from previous files
+		diagnostics.clear();
+		
 		var path = Paths.get(file);
 		server.lint (List.of(path));
 		
@@ -58,7 +61,12 @@ public class CodeActionTest extends BaseTest {
 		params.setTextDocument(new TextDocumentIdentifier(path.toUri().toString()));
 		
 		var future = server.codeAction(params);
-		var list = future.get();
+		var list = new ArrayList<>();
+		try {
+			list = (ArrayList) future.get();
+		} catch (Throwable th) {
+			th.printStackTrace();
+		}
 		
 		return mapTitles(logAndReturn(list));
 	}

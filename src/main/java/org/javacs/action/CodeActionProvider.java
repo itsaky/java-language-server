@@ -206,8 +206,13 @@ public class CodeActionProvider {
                 var generateConstructor = new GenerateRecordConstructor(needsConstructor);
                 return createQuickFix("Generate constructor", generateConstructor, d);
             case "compiler.err.does.not.override.abstract":
-                var missingAbstracts = findClass(task, d.getRange());
-                var implementAbstracts = new ImplementAbstractMethods(missingAbstracts);
+            	final var root = task.root();
+            	final var lines = root.getLineMap();
+                final var treeFinder = newClassFinder(task);
+                final var range = d.getRange();
+                final var position = lines.getPosition(range.getStart().getLine() + 1, range.getStart().getCharacter() + 1);
+                final var tree = treeFinder.scan(root, position);
+                final var implementAbstracts = new ImplementAbstractMethods(file, tree, treeFinder.getStoredTreePath());
                 return createQuickFix("Implement abstract methods", implementAbstracts, d);
             case "compiler.err.cant.resolve.location.args":
                 var missingMethod = new CreateMissingMethod(file, findPosition(task, d.getRange().getStart()));
@@ -233,10 +238,14 @@ public class CodeActionProvider {
         if (type == null) return null;
         return qualifiedName(task, type);
     }
+    
+    private FindTypeDeclarationAt newClassFinder (CompileTask task) {
+    	return new FindTypeDeclarationAt(task.task);
+    }
 
     private ClassTree findClassTree(CompileTask task, Range range) {
         var position = task.root().getLineMap().getPosition(range.getStart().getLine() + 1, range.getStart().getCharacter() + 1);
-        return new FindTypeDeclarationAt(task.task).scan(task.root(), position);
+        return newClassFinder(task).scan(task.root(), position);
     }
 
     private String qualifiedName(CompileTask task, ClassTree tree) {

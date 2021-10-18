@@ -1,9 +1,12 @@
 package org.javacs.rewrite;
 
+import com.sun.source.tree.ClassTree;
 import com.sun.source.tree.MethodTree;
+import com.sun.source.util.TreePath;
 import com.sun.source.util.Trees;
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.Objects;
 import java.util.StringJoiner;
 import java.util.logging.Logger;
 import javax.lang.model.element.ElementKind;
@@ -18,21 +21,28 @@ import org.javacs.FindHelper;
 import org.eclipse.lsp4j.*;
 
 public class ImplementAbstractMethods implements Rewrite {
-    final String className;
-
-    public ImplementAbstractMethods(String className) {
-        this.className = className;
+    final Path file;
+    final ClassTree tree;
+    final TreePath path;
+    
+    public ImplementAbstractMethods(final Path file, final ClassTree tree, final TreePath path) {
+        Objects.requireNonNull(file);
+        Objects.requireNonNull(tree);
+        Objects.requireNonNull(path);
+        
+        this.file = file;
+        this.tree = tree;
+        this.path = path;
     }
 
     @Override
     public Map<Path, TextEdit[]> rewrite(CompilerProvider compiler) {
-        var file = compiler.findTypeDeclaration(className);
         var insertText = new StringJoiner("\n");
         try (var task = compiler.compile(file)) {
             var elements = task.task.getElements();
             var types = task.task.getTypes();
             var trees = Trees.instance(task.task);
-            var thisClass = elements.getTypeElement(className);
+            var thisClass = (TypeElement) trees.getElement(this.path);
             var thisType = (DeclaredType) thisClass.asType();
             var thisTree = trees.getTree(thisClass);
             var indent = EditHelper.indent(task.task, task.root(), thisTree) + 4;

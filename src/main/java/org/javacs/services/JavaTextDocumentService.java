@@ -1,7 +1,7 @@
 package org.javacs.services;
 
 import java.util.List;
-import java9.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletableFuture;
 
 import com.itsaky.lsp.SemanticHighlightsParams;
 import com.itsaky.lsp.SemanticHighlight;
