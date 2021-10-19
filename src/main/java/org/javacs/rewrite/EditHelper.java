@@ -127,6 +127,6 @@ class EditHelper {
         var end = pos.getEndPosition(root, leaf);
         var line = (int) lines.getLineNumber(end);
         var column = (int) lines.getColumnNumber(end);
-        return new Position(line - 1, column - 1);
+        return new Position(line - 1, column - 2);
     }
 }
