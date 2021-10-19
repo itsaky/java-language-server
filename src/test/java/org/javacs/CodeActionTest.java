@@ -61,12 +61,7 @@ public class CodeActionTest extends BaseTest {
 		params.setTextDocument(new TextDocumentIdentifier(path.toUri().toString()));
 		
 		var future = server.codeAction(params);
-		var list = new ArrayList<>();
-		try {
-			list = (ArrayList) future.get();
-		} catch (Throwable th) {
-			th.printStackTrace();
-		}
+		var list = future.get();
 		
 		return mapTitles(logAndReturn(list));
 	}

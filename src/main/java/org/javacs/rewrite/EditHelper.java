@@ -126,6 +126,7 @@ class EditHelper {
         var lines = root.getLineMap();
         var end = pos.getEndPosition(root, leaf);
         var line = (int) lines.getLineNumber(end);
-        return new Position(line - 1, 0);
+        var column = (int) lines.getColumnNumber(end);
+        return new Position(line - 1, column - 1);
     }
 }
