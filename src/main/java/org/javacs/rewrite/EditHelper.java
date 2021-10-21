@@ -104,6 +104,19 @@ class EditHelper {
         var startLine = lines.getStartPosition(lines.getLineNumber(startClass));
         return (int) (startClass - startLine);
     }
+    
+    static int indent (final String contents, final int cursor) {
+    	int indent = 0;
+    	for (var i=0;i<=cursor && i<contents.length();i++) {
+    		var c = contents.charAt(i);
+    		if(c == '{') {
+    			indent++;
+    		} else if (c == '}') {
+    			indent--;
+    		}
+    	}
+    	return indent * 4;
+    }
 
     static Position insertBefore(final JavacTask task, final CompilationUnitTree root, final Tree member) {
         var pos = Trees.instance(task).getSourcePositions();

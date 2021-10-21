@@ -168,7 +168,7 @@ class ReusableCompiler {
             super();
             this.arguments = arguments;
             put(Log.logKey, ReusableLog.factory);
-            put(JavaCompiler.compilerKey, ReusableJavaCompiler.factory);
+            	put(JavaCompiler.compilerKey, ReusableJavaCompiler.factory);
         }
 
         void clear() {
@@ -206,6 +206,22 @@ class ReusableCompiler {
         public void started(TaskEvent e) {
             // do nothing
         }
+        
+        /** Set the factory for the key in this context. */
+        @Override
+   	 public <T> void put(Key<T> key, Factory<T> fac) {
+ 	       try {
+ 	       	super.put(key, fac);
+ 	       } catch (Exception e) {}
+	    }
+
+	    /** Set the value for the key in this context. */
+	    @Override
+ 	   public <T> void put(Key<T> key, T data) {
+	        try {
+ 	       	super.put(key, data);
+ 	       } catch (Exception e) {}
+	    }
 
         <T> void drop(Key<T> k) {
             ht.remove(k);
@@ -214,6 +230,11 @@ class ReusableCompiler {
         <T> void drop(Class<T> c) {
             ht.remove(key(c));
         }
+        
+        private static void checkState(java.util.Map<?,?> t) {
+      	  if (t == null)
+ 	           throw new IllegalStateException();
+	    }
 
         /**
          * Reusable JavaCompiler; exposes a method to clean up the component from leftovers associated with previous
