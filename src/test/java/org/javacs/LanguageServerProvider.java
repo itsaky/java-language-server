@@ -84,4 +84,10 @@ public class LanguageServerProvider {
 		return params;
 	}
 	
+	static void shutdown (JavaLanguageServer server) {
+		server.shutdown().whenComplete((a, b) -> {
+			server.exit();
+		});
+	}
+	
 }

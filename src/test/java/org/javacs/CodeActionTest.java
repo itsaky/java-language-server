@@ -63,7 +63,9 @@ public class CodeActionTest extends BaseTest {
 		var future = server.codeAction(params);
 		var list = future.get();
 		
-		return mapTitles(logAndReturn(list));
+		LanguageServerProvider.shutdown(server);
+		
+		return mapTitles(list);
 	}
 	
 	static List<String> mapTitles (List<Either<Command, CodeAction>> actions) {

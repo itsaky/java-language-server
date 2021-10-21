@@ -7,15 +7,22 @@ import com.sun.source.util.TreeScanner;
 import com.sun.source.util.Trees;
 import java.util.*;
 import javax.lang.model.element.Element;
+import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
+import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeKind;
+import javax.lang.model.type.TypeMirror;
 
-class WarnUnused extends TreeScanner<Void, Void> {
+class DiagnosticVisitor extends TreeScanner<Void, Map<TreePath, String>> {
     // Copied from TreePathScanner
     // We need to be able to call scan(path, _) recursively
     private TreePath path;
-
+    private final JavacTask task;
+    private CompilationUnitTree root;
+    private Map<String, TreePath> declaredExceptions = new HashMap<>();
+    private Set<String> observedExceptions = new HashSet<>();
+    
     private void scanPath(TreePath path) {
         TreePath prev = this.path;
         this.path = path;
@@ -27,9 +34,9 @@ class WarnUnused extends TreeScanner<Void, Void> {
     }
 
     @Override
-    public Void scan(Tree tree, Void p) {
+    public Void scan(Tree tree, Map<TreePath, String> p) {
         if (tree == null) return null;
-
+        
         TreePath prev = path;
         path = new TreePath(path, tree);
         try {
@@ -43,7 +50,8 @@ class WarnUnused extends TreeScanner<Void, Void> {
     private final Map<Element, TreePath> privateDeclarations = new HashMap<>(), localVariables = new HashMap<>();
     private final Set<Element> used = new HashSet<>();
 
-    WarnUnused(JavacTask task) {
+    DiagnosticVisitor(JavacTask task) {
+        this.task = task;
         this.trees = Trees.instance(task);
     }
 
@@ -149,14 +157,33 @@ class WarnUnused extends TreeScanner<Void, Void> {
         }
         return true;
     }
+    
+    private Map<String, TreePath> declared(MethodTree t) {
+        var names = new HashMap<String, TreePath>();
+        for (var e : t.getThrows()) {
+            var path = new TreePath(this.path, e);
+            var to = trees.getElement(path);
+            if (!(to instanceof TypeElement)) continue;
+            var type = (TypeElement) to;
+            var name = type.getQualifiedName().toString();
+            names.put(name, path);
+        }
+        return names;
+    }
+    
+    @Override
+    public Void visitCompilationUnit(CompilationUnitTree t, Map<TreePath, String> notThrown) {
+        root = t;
+        return super.visitCompilationUnit(t, notThrown);
+    }
 
     @Override
-    public Void visitVariable(VariableTree t, Void __) {
+    public Void visitVariable(VariableTree t, Map<TreePath, String> notThrown) {
         if (isLocalVariable(path)) {
             foundLocalVariable();
-            super.visitVariable(t, null);
+            super.visitVariable(t, notThrown);
         } else if (isReachable(path)) {
-            super.visitVariable(t, null);
+            super.visitVariable(t, notThrown);
         } else {
             foundPrivateDeclaration();
         }
@@ -164,9 +191,33 @@ class WarnUnused extends TreeScanner<Void, Void> {
     }
 
     @Override
-    public Void visitMethod(MethodTree t, Void __) {
+    public Void visitMethod(MethodTree t, Map<TreePath, String> notThrown) {
+        // Create a new method scope
+        var pushDeclared = declaredExceptions;
+        var pushObserved = observedExceptions;
+        declaredExceptions = declared(t);
+        observedExceptions = new HashSet<>();
+        // Recursively scan for 'throw' and method calls
+        super.visitMethod(t, notThrown);
+        // Check for exceptions that were never thrown
+        for (var exception : declaredExceptions.keySet()) {
+            if (!observedExceptions.contains(exception)) {
+                notThrown.put(declaredExceptions.get(exception), exception);
+            }
+        }
+        declaredExceptions = pushDeclared;
+        observedExceptions = pushObserved;
+        
+        if (!isReachable(path)) {
+            foundPrivateDeclaration();
+        }
+        return null;
+    }
+
+    @Override
+    public Void visitClass(ClassTree t, Map<TreePath, String> notThrown) {
         if (isReachable(path)) {
-            super.visitMethod(t, null);
+            super.visitClass(t, notThrown);
         } else {
             foundPrivateDeclaration();
         }
@@ -174,36 +225,55 @@ class WarnUnused extends TreeScanner<Void, Void> {
     }
 
     @Override
-    public Void visitClass(ClassTree t, Void __) {
-        if (isReachable(path)) {
-            super.visitClass(t, null);
-        } else {
-            foundPrivateDeclaration();
+    public Void visitIdentifier(IdentifierTree t, Map<TreePath, String> notThrown) {
+        foundReference();
+        return super.visitIdentifier(t, notThrown);
+    }
+
+    @Override
+    public Void visitMemberSelect(MemberSelectTree t, Map<TreePath, String> notThrown) {
+        foundReference();
+        return super.visitMemberSelect(t, notThrown);
+    }
+
+    @Override
+    public Void visitMemberReference(MemberReferenceTree t, Map<TreePath, String> notThrown) {
+        foundReference();
+        return super.visitMemberReference(t, notThrown);
+    }
+
+    @Override
+    public Void visitNewClass(NewClassTree t, Map<TreePath, String> notThrown) {
+        foundReference();
+        return super.visitNewClass(t, notThrown);
+    }
+    
+    @Override
+    public Void visitThrow(ThrowTree t, Map<TreePath, String> notThrown) {
+        var path = new TreePath(this.path, t.getExpression());
+        var type = trees.getTypeMirror(path);
+        addThrown(type);
+        return super.visitThrow(t, notThrown);
+    }
+    
+    @Override
+    public Void visitMethodInvocation(MethodInvocationTree t, Map<TreePath, String> notThrown) {
+        var target = trees.getElement(this.path);
+        if (target instanceof ExecutableElement) {
+            var method = (ExecutableElement) target;
+            for (var type : method.getThrownTypes()) {
+                addThrown(type);
+            }
         }
-        return null;
+        return super.visitMethodInvocation(t, notThrown);
     }
 
-    @Override
-    public Void visitIdentifier(IdentifierTree t, Void __) {
-        foundReference();
-        return super.visitIdentifier(t, null);
-    }
-
-    @Override
-    public Void visitMemberSelect(MemberSelectTree t, Void __) {
-        foundReference();
-        return super.visitMemberSelect(t, null);
-    }
-
-    @Override
-    public Void visitMemberReference(MemberReferenceTree t, Void __) {
-        foundReference();
-        return super.visitMemberReference(t, null);
-    }
-
-    @Override
-    public Void visitNewClass(NewClassTree t, Void __) {
-        foundReference();
-        return super.visitNewClass(t, null);
+    private void addThrown(TypeMirror type) {
+        if (type instanceof DeclaredType) {
+            var declared = (DeclaredType) type;
+            var el = (TypeElement) declared.asElement();
+            var name = el.getQualifiedName().toString();
+            observedExceptions.add(name);
+        }
     }
 }

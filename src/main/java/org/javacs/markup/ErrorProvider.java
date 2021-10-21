@@ -2,6 +2,9 @@ package org.javacs.markup;
 
 import com.sun.source.tree.*;
 import com.sun.source.util.*;
+import com.sun.tools.javac.tree.DocCommentTable;
+import com.sun.tools.javac.tree.JCTree.JCCompilationUnit;
+
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -31,8 +34,7 @@ public class ErrorProvider {
             var uri = root.getSourceFile().toUri().toString();
             var diagnostics = new ArrayList<org.eclipse.lsp4j.Diagnostic>();
             diagnostics.addAll(compilerErrors(root));
-            diagnostics.addAll(unusedWarnings(root));
-            diagnostics.addAll(notThrownWarnings(root));
+            diagnostics.addAll(visitForDiagnostics(root));
             
             result[i] = new PublishDiagnosticsParams();
             result[i].setUri(uri);
@@ -57,26 +59,20 @@ public class ErrorProvider {
         return result;
     }
 
-    private List<org.eclipse.lsp4j.Diagnostic> unusedWarnings(CompilationUnitTree root) {
+    private List<org.eclipse.lsp4j.Diagnostic> visitForDiagnostics(CompilationUnitTree root) {
         var result = new ArrayList<org.eclipse.lsp4j.Diagnostic>();
-        var warnUnused = new WarnUnused(task.task);
-        warnUnused.scan(root, null);
+        var notThrown = new HashMap<TreePath, String>();
+        var warnUnused = new DiagnosticVisitor(task.task);
+        warnUnused.scan(root, notThrown);
         for (var unusedEl : warnUnused.notUsed()) {
             result.add(warnUnused(unusedEl));
         }
-        return result;
-    }
-
-    private List<org.eclipse.lsp4j.Diagnostic> notThrownWarnings(CompilationUnitTree root) {
-        var result = new ArrayList<org.eclipse.lsp4j.Diagnostic>();
-        var notThrown = new HashMap<TreePath, String>();
-        new WarnNotThrown(task.task).scan(root, notThrown);
         for (var location : notThrown.keySet()) {
             result.add(warnNotThrown(notThrown.get(location), location));
         }
         return result;
     }
-
+    
     /**
      * lspDiagnostic(d, lines) converts d to LSP format, with its position shifted appropriately for the latest version
      * of the file.
