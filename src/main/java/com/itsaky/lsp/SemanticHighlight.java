@@ -8,7 +8,7 @@ public class SemanticHighlight {
 	
 	public String uri;
 	
-	public List<Range>
+	public final List<Range>
         packages = new ArrayList<>(),
         enumTypes = new ArrayList<>(),
         classNames = new ArrayList<>(),
@@ -27,4 +27,6 @@ public class SemanticHighlight {
         instanceInits = new ArrayList<>(),
         typeParams = new ArrayList<>(),
         resourceVariables = new ArrayList<>();
+        
+    public final JavadocHighlights javadocs = new JavadocHighlights();
 }

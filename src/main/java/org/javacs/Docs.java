@@ -9,6 +9,13 @@ import java.util.*;
 import java.util.logging.Logger;
 import javax.tools.*;
 
+import com.sun.source.doctree.DocCommentTree;
+import com.sun.source.tree.Tree;
+import com.sun.source.util.TreePath;
+import com.sun.source.util.Trees;
+import com.sun.tools.javac.tree.JCTree;
+import com.sun.tools.javac.tree.JCTree.JCCompilationUnit;
+
 public class Docs {
 
     /** File manager with source-path + platform sources, which we will use to look up individual source files */
@@ -63,6 +70,17 @@ public class Docs {
         }
         LOG.warning("Couldn't find src.zip in " + javaHome);
         return NOT_FOUND;
+    }
+    
+    public static DocCommentTree getDocumentation (TreePath path) {
+    	final Tree tree = path.getLeaf();
+    	if(path.getCompilationUnit() instanceof JCCompilationUnit && tree instanceof JCTree) {
+    		JCCompilationUnit unit = (JCCompilationUnit) path.getCompilationUnit();
+    		if(unit.docComments != null) {
+    			return unit.docComments.getCommentTree ((JCTree) tree);
+    		}
+    	}
+    	return null;
     }
 
     private static final Logger LOG = Logger.getLogger("main");

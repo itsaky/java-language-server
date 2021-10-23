@@ -5,7 +5,12 @@ import com.sun.source.util.JavacTask;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.TreeScanner;
 import com.sun.source.util.Trees;
+
+import org.eclipse.lsp4j.jsonrpc.CancelChecker;
+
 import java.util.*;
+import java.util.logging.Logger;
+
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
@@ -19,6 +24,7 @@ class DiagnosticVisitor extends TreeScanner<Void, Map<TreePath, String>> {
     // We need to be able to call scan(path, _) recursively
     private TreePath path;
     private final JavacTask task;
+    private final CancelChecker checker;
     private CompilationUnitTree root;
     private Map<String, TreePath> declaredExceptions = new HashMap<>();
     private Set<String> observedExceptions = new HashSet<>();
@@ -39,6 +45,7 @@ class DiagnosticVisitor extends TreeScanner<Void, Map<TreePath, String>> {
         
         TreePath prev = path;
         path = new TreePath(path, tree);
+        
         try {
             return tree.accept(this, p);
         } finally {
@@ -50,8 +57,9 @@ class DiagnosticVisitor extends TreeScanner<Void, Map<TreePath, String>> {
     private final Map<Element, TreePath> privateDeclarations = new HashMap<>(), localVariables = new HashMap<>();
     private final Set<Element> used = new HashSet<>();
 
-    DiagnosticVisitor(JavacTask task) {
+    DiagnosticVisitor(JavacTask task, CancelChecker checker) {
         this.task = task;
+        this.checker = checker;
         this.trees = Trees.instance(task);
     }
 
@@ -69,14 +77,17 @@ class DiagnosticVisitor extends TreeScanner<Void, Map<TreePath, String>> {
     }
 
     private void foundPrivateDeclaration() {
+        checker.checkCanceled();
         privateDeclarations.put(trees.getElement(path), path);
     }
 
     private void foundLocalVariable() {
+        checker.checkCanceled();
         localVariables.put(trees.getElement(path), path);
     }
 
     private void foundReference() {
+        checker.checkCanceled();
         var toEl = trees.getElement(path);
         if (toEl == null) {
             return;
@@ -174,11 +185,13 @@ class DiagnosticVisitor extends TreeScanner<Void, Map<TreePath, String>> {
     @Override
     public Void visitCompilationUnit(CompilationUnitTree t, Map<TreePath, String> notThrown) {
         root = t;
+        checker.checkCanceled();
         return super.visitCompilationUnit(t, notThrown);
     }
 
     @Override
     public Void visitVariable(VariableTree t, Map<TreePath, String> notThrown) {
+        checker.checkCanceled();
         if (isLocalVariable(path)) {
             foundLocalVariable();
             super.visitVariable(t, notThrown);
@@ -192,6 +205,7 @@ class DiagnosticVisitor extends TreeScanner<Void, Map<TreePath, String>> {
 
     @Override
     public Void visitMethod(MethodTree t, Map<TreePath, String> notThrown) {
+        checker.checkCanceled();
         // Create a new method scope
         var pushDeclared = declaredExceptions;
         var pushObserved = observedExceptions;
@@ -216,6 +230,7 @@ class DiagnosticVisitor extends TreeScanner<Void, Map<TreePath, String>> {
 
     @Override
     public Void visitClass(ClassTree t, Map<TreePath, String> notThrown) {
+        checker.checkCanceled();
         if (isReachable(path)) {
             super.visitClass(t, notThrown);
         } else {
@@ -250,6 +265,7 @@ class DiagnosticVisitor extends TreeScanner<Void, Map<TreePath, String>> {
     
     @Override
     public Void visitThrow(ThrowTree t, Map<TreePath, String> notThrown) {
+        checker.checkCanceled();
         var path = new TreePath(this.path, t.getExpression());
         var type = trees.getTypeMirror(path);
         addThrown(type);
@@ -258,6 +274,7 @@ class DiagnosticVisitor extends TreeScanner<Void, Map<TreePath, String>> {
     
     @Override
     public Void visitMethodInvocation(MethodInvocationTree t, Map<TreePath, String> notThrown) {
+        checker.checkCanceled();
         var target = trees.getElement(this.path);
         if (target instanceof ExecutableElement) {
             var method = (ExecutableElement) target;
@@ -269,6 +286,7 @@ class DiagnosticVisitor extends TreeScanner<Void, Map<TreePath, String>> {
     }
 
     private void addThrown(TypeMirror type) {
+        checker.checkCanceled();
         if (type instanceof DeclaredType) {
             var declared = (DeclaredType) type;
             var el = (TypeElement) declared.asElement();
@@ -276,4 +294,6 @@ class DiagnosticVisitor extends TreeScanner<Void, Map<TreePath, String>> {
             observedExceptions.add(name);
         }
     }
+    
+    private static final Logger LOG = Logger.getLogger("main");
 }

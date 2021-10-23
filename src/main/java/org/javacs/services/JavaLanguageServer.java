@@ -13,6 +13,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Logger;
 
@@ -129,14 +130,11 @@ public class JavaLanguageServer implements IDELanguageServer, IDELanguageClientA
 	private boolean uncheckedChanges = false;
     private Path lastEdited = Paths.get("");
 	
-	private final DocumentChangeHandler changeHandler;
-	private final Thread changeHandlerThread;
 	private static final Logger LOG = Logger.getLogger("main");
 	
+	private CompletableFuture<Object> lastLintTask;
+	
 	public JavaLanguageServer () {
-		this.changeHandler = new DocumentChangeHandler();
-		this.changeHandlerThread = new Thread(changeHandler);
-		this.changeHandlerThread.setDaemon(true);
 	}
 	
 	JavaCompilerService compiler() {
@@ -159,33 +157,46 @@ public class JavaLanguageServer implements IDELanguageServer, IDELanguageClientA
 		return false;
 	}
 
-	public void lint(Collection<Path> files) {
-		if (files.isEmpty()) return;
-		LOG.info("Lint " + files.size() + " files...");
-		var started = Instant.now();
-		try (var task = compiler().compile(files.toArray(Path[]::new))) {
-			var compiled = Instant.now();
-			
-			// Provide errors
-			try {
-				LOG.info("...compiled in " + Duration.between(started, compiled).toMillis() + " ms");
-				for (var errs : new ErrorProvider(compiler(), task).errors()) {
-					client.publishDiagnostics(errs);
+	public CompletableFuture<Object> lint(Collection<Path> files) {
+		
+		cancelLint();
+		
+		return lastLintTask = CompletableFutures.computeAsync(checker -> {
+			if (files.isEmpty()) return null;
+			LOG.info("Lint " + files.size() + " files...");
+			var started = Instant.now();
+			try (var task = compiler().compile(files.toArray(Path[]::new))) {
+				var compiled = Instant.now();
+				try {
+					LOG.info("...compiled in " + Duration.between(started, compiled).toMillis() + " ms");
+					for (var errs : new ErrorProvider(compiler(), task, checker).errors()) {
+						client.publishDiagnostics(errs);
+					}
+					var published = Instant.now();
+					LOG.info("...published in " + Duration.between(started, published).toMillis() + " ms");
+				} catch (Throwable th) {
+					th.printStackTrace();
+					CrashHandler.logCrash(th);
 				}
-				var published = Instant.now();
-				LOG.info("...published in " + Duration.between(started, published).toMillis() + " ms");
-			} catch (Throwable th) {
-				CrashHandler.logCrash(th);
+				try {
+					for(var highlight : new SemanticHighlightProvider(task, checker).highlights()) {
+						client.semanticHighlights(highlight);
+					}
+				} catch (Throwable th) {
+					th.printStackTrace();
+					CrashHandler.logCrash(th);
+				}
+			} catch (CancellationException e) {
+				e.printStackTrace();
 			}
 			
-			// Provide semantic syntax highlights
-			try {
-				for(var highlight : new SemanticHighlightProvider(task).highlights()) {
-					client.semanticHighlights(highlight);
-				}
-			} catch (Throwable th) {
-				CrashHandler.logCrash(th);
-			}
+			return null;
+		});
+	}
+	
+	private void cancelLint () {
+		if(lastLintTask != null && !lastLintTask.isDone()) {
+			lastLintTask.cancel(true);
 		}
 	}
 
@@ -404,12 +415,6 @@ public class JavaLanguageServer implements IDELanguageServer, IDELanguageClientA
 	@Override
 	public void initialized(InitializedParams params) {
 		client.registerCapability(registerClientCapabilities());
-		
-		// Start the change handler thread once server
-		// has been initialized
-		
-		changeHandlerThread.start();
-		
 		LOG.info("Server initialized");
 	}
 	
@@ -420,12 +425,11 @@ public class JavaLanguageServer implements IDELanguageServer, IDELanguageClientA
 
 	@Override
 	public void cancelProgress(WorkDoneProgressCancelParams p1) {
-		// TODO Check what to do in this method
 	}
 
 	@Override
 	public void exit() {
-		changeHandler.stop();
+		cancelLint();
 		Main.exit();
 	}
 
@@ -540,9 +544,7 @@ public class JavaLanguageServer implements IDELanguageServer, IDELanguageClientA
         LOG.info("Received java settings " + java);
         settings = java.getAsJsonObject();
         
-        changeHandler.pause();
         doAsyncWork(true);
-        changeHandler.resume();
 	}
 	
 	@Override
@@ -740,6 +742,7 @@ public class JavaLanguageServer implements IDELanguageServer, IDELanguageClientA
 		FileStore.change(params);
         lastEdited = Paths.get(URI.create(params.getTextDocument().getUri()));
         uncheckedChanges = true;
+        lint(FileStore.activeDocuments());
 	}
 
 	@Override
@@ -756,8 +759,6 @@ public class JavaLanguageServer implements IDELanguageServer, IDELanguageClientA
         if (!FileStore.isJavaFile(URI.create(params.getTextDocument().getUri()))) return;
         lastEdited = Paths.get(URI.create(params.getTextDocument().getUri()));
         uncheckedChanges = true;
-        
-        this.changeHandler.setLastChanged(System.currentTimeMillis());
 	}
 
 	@Override
@@ -770,50 +771,15 @@ public class JavaLanguageServer implements IDELanguageServer, IDELanguageClientA
 	@Override
 	public CompletableFuture<List<SemanticHighlight>> semanticHighlights(SemanticHighlightsParams params) {
 		return CompletableFutures.computeAsync(checker -> {
-			var file = Paths.get(URI.create(params.getDocument().getUri()));
+			var file = Paths.get(URI.create(params.getTextDocument().getUri()));
 			if(!FileStore.isJavaFile(file)) {
 				throw new IllegalArgumentException("File is not a java file");
 			}
 			try (var task = compiler().compile(file)) {
-				var provider = new SemanticHighlightProvider(task);
+				var provider = new SemanticHighlightProvider(task, checker);
 				return provider.highlights();
 			}
 		});
-	}
-	
-	class DocumentChangeHandler implements Runnable {
-		
-		private long lastChanged;
-		private boolean stopped = false;
-		private boolean paused = false;
-		
-		public void setLastChanged(long changed) {
-			this.lastChanged = changed;
-		}
-		
-		public void stop() {
-			this.stopped = true;
-		}
-		
-		public void pause() {
-			this.paused = true;
-		}
-		
-		public void resume() {
-			this.paused = false;
-		}
-		
-		@Override
-		public void run() {
-			while (!stopped && !paused) {
-				if((System.currentTimeMillis() - lastChanged) >= 150) {
-					doAsyncWork(false);
-					try {
-						Thread.sleep(100);
-					} catch (InterruptedException e) {}
-				}
-			}
-		}
 	}
 	
 	public static final Position Position_NONE = new Position(-1, -1);

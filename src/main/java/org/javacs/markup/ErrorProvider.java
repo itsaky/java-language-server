@@ -2,8 +2,6 @@ package org.javacs.markup;
 
 import com.sun.source.tree.*;
 import com.sun.source.util.*;
-import com.sun.tools.javac.tree.DocCommentTable;
-import com.sun.tools.javac.tree.JCTree.JCCompilationUnit;
 
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -16,14 +14,17 @@ import org.javacs.CompileTask;
 import org.javacs.CompilerProvider;
 import org.javacs.FileStore;
 import org.eclipse.lsp4j.*;
+import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 
 public class ErrorProvider {
-    final CompileTask task;
-    final CompilerProvider compiler;
-
-    public ErrorProvider(CompilerProvider compiler, CompileTask task) {
+    private final CompileTask task;
+    private final CompilerProvider compiler;
+    private final CancelChecker checker;
+    
+    public ErrorProvider(CompilerProvider compiler, CompileTask task, CancelChecker checker) {
         this.compiler = compiler;
         this.task = task;
+        this.checker = checker;
     }
 
     public PublishDiagnosticsParams[] errors() {
@@ -62,7 +63,7 @@ public class ErrorProvider {
     private List<org.eclipse.lsp4j.Diagnostic> visitForDiagnostics(CompilationUnitTree root) {
         var result = new ArrayList<org.eclipse.lsp4j.Diagnostic>();
         var notThrown = new HashMap<TreePath, String>();
-        var warnUnused = new DiagnosticVisitor(task.task);
+        var warnUnused = new DiagnosticVisitor(task.task, checker);
         warnUnused.scan(root, notThrown);
         for (var unusedEl : warnUnused.notUsed()) {
             result.add(warnUnused(unusedEl));
@@ -111,11 +112,13 @@ public class ErrorProvider {
     }
 
     private org.eclipse.lsp4j.Diagnostic warnNotThrown(String name, TreePath path) {
+        checker.checkCanceled();
         var trees = Trees.instance(task.task);
         var pos = trees.getSourcePositions();
         var root = path.getCompilationUnit();
         var start = pos.getStartPosition(root, path.getLeaf());
         var end = pos.getEndPosition(root, path.getLeaf());
+        checker.checkCanceled();
         var d = new org.eclipse.lsp4j.Diagnostic();
         d.setMessage(String.format("'%s' is not thrown in the body of the method", name));
         d.setRange(RangeHelper.range(root, start, end));
@@ -188,6 +191,7 @@ public class ErrorProvider {
 
     private org.eclipse.lsp4j.Diagnostic lspWarnUnused(
             DiagnosticSeverity severity, String code, String message, int start, int end, CompilationUnitTree root) {
+        checker.checkCanceled();
         var result = new org.eclipse.lsp4j.Diagnostic();
         result.setSeverity(severity);
         result.setCode(code);
