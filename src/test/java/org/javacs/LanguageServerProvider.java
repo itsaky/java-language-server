@@ -1,6 +1,7 @@
 package org.javacs;
 
 import java.io.File;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -78,7 +79,7 @@ public class LanguageServerProvider {
 		final var root = new WorkspaceFolder();
 		
 		root.setName("Example project");
-		root.setUri(new File("/storage/emulated/0/AppProjects/java-language-server/src/test/projects/maven-project").toURI().toString());
+		root.setUri(Paths.get("./src/test/projects/maven-project").toUri().toString());
 		params.setWorkspaceFolders(List.of(root));
 		
 		return params;

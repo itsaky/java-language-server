@@ -22,15 +22,6 @@ import static org.junit.jupiter.api.Assertions.*;
 public class CodeActionTest extends BaseTest {
 	
 	private static final List<Diagnostic> diagnostics = new ArrayList<>();
-	private static JavaLanguageServer server ;
-	
-	static {
-		try {
-			server = LanguageServerProvider.getLanguageServer(CodeActionTest::addDiagnostic);
-		} catch (Throwable th) {
-			th.printStackTrace();
-		}
-	}
 	
 	public CodeActionTest() {}
 	
@@ -40,12 +31,12 @@ public class CodeActionTest extends BaseTest {
 	
 	@Test
 	public void testImplementAbstractMethods() throws InterruptedException, ExecutionException {
-		assertTrue(quickFix("/storage/emulated/0/AppProjects/java-language-server/src/test/projects/maven-project/src/org/javacs/action/TestImplementAbstractMethods.java").contains("Implement abstract methods"));
+		assertTrue(quickFix("org/javacs/action/TestImplementAbstractMethods.java").contains("Implement abstract methods"));
 	}
 	
 	@Test
 	public void testImplementAbstractMethodsAnonymous() throws InterruptedException, ExecutionException {
-		assertTrue(quickFix("/storage/emulated/0/AppProjects/java-language-server/src/test/projects/maven-project/src/org/javacs/action/TestImplementAbstractMethodsAnonymous.java").contains("Implement abstract methods"));
+		assertTrue(quickFix("org/javacs/action/TestImplementAbstractMethodsAnonymous.java").contains("Implement abstract methods"));
 	}
 	
 	static List<String> quickFix (String file) throws InterruptedException, ExecutionException {
@@ -53,15 +44,25 @@ public class CodeActionTest extends BaseTest {
 		// Clear any diagnostics from previous files
 		diagnostics.clear();
 		
-		var path = Paths.get(file);
-		server.lint (List.of(path));
+		var server = LanguageServerProvider.getLanguageServer(d -> {
+			diagnostics.add (d);
+		});
+		
+		var path = FileFinder.path(file);
+		server.lint (List.of(path)).get();
 		
 		var params = new CodeActionParams();
 		params.setContext(new CodeActionContext(diagnostics));
 		params.setTextDocument(new TextDocumentIdentifier(path.toUri().toString()));
 		
 		var future = server.codeAction(params);
-		var list = future.get();
+		List<Either<Command, CodeAction>> list = new ArrayList<>();
+		
+		try {
+			list = future.get();
+		} catch (Throwable th) {
+			th.printStackTrace();
+		}
 		
 		LanguageServerProvider.shutdown(server);
 		
