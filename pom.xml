@@ -42,12 +42,6 @@
 			<artifactId>org.eclipse.lsp4j</artifactId>
 			<version>0.12.0</version>
 		</dependency>
-		<!-- Xtend Support -->
-		<dependency>
-			<groupId>org.eclipse.xtend</groupId>
-			<artifactId>org.eclipse.xtend.lib</artifactId>
-			<version>2.25.0</version>
-		</dependency>
 		<!-- Testing framework -->
 		<dependency>
 			<groupId>org.junit.jupiter</groupId>
@@ -108,23 +102,6 @@
 						</path>
 					</annotationProcessorPaths>
 				</configuration>
-			</plugin>
-			<plugin>
-				<groupId>org.eclipse.xtend</groupId>
-				<artifactId>xtend-maven-plugin</artifactId>
-				<version>2.25.0</version>
-				<executions>
-					<execution>
-						<goals>
-							<goal>compile</goal>
-							<goal>testCompile</goal>
-						</goals>
-						<configuration>
-							<outputDirectory>${project.basedir}/src/main/xtend-gen</outputDirectory>
-							<testOutputDirectory>${project.basedir}/test/xtend-gen</testOutputDirectory>
-						</configuration>
-					</execution>
-				</executions>
 			</plugin>
 			<!-- Package as single jar -->
 			<plugin>
