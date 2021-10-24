@@ -62,6 +62,10 @@ public class ErrorProvider {
 
     private List<org.eclipse.lsp4j.Diagnostic> visitForDiagnostics(CompilationUnitTree root) {
         var result = new ArrayList<org.eclipse.lsp4j.Diagnostic>();
+        if(task == null || task.task == null) {
+        	// Cannot provide any diagnostics with a null task
+        	return result;
+        }
         var notThrown = new HashMap<TreePath, String>();
         var warnUnused = new DiagnosticVisitor(task.task, checker);
         warnUnused.scan(root, notThrown);

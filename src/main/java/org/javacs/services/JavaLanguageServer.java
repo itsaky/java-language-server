@@ -193,8 +193,10 @@ public class JavaLanguageServer implements IDELanguageServer, IDELanguageClientA
 	}
 	
 	private void cancelLint () {
-		if(lastLintTask != null && !lastLintTask.isDone()) {
+		try {
 			lastLintTask.cancel(true);
+		} catch (Throwable th) {
+			// Ignored
 		}
 	}
 

@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Logger;
 
-import com.google.gson.Gson;
 import com.itsaky.lsp.SemanticHighlight;
 
 import org.eclipse.lsp4j.jsonrpc.CancelChecker;
@@ -27,6 +26,7 @@ public class SemanticHighlightProvider {
             final var color = new SemanticHighlight();
             color.uri = root.getSourceFile().toUri().toString();
             try {
+            	if(task == null || task.task == null) break;
             	final var highlighter = new SemanticHighlighter(task, root, checker);
             	highlighter.scan (root, color);
             	if(!highlighter.getDocs().isEmpty()) {
