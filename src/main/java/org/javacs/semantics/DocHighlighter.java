@@ -114,8 +114,8 @@ public class DocHighlighter extends DocTreeScanner <Void, JavadocHighlights> {
 			endCol = lines.getColumnNumber(end) - 1;
 			
 			final var closing = new Range();
-			closing.setStart(new Position((int) endLine, (int) endCol));
-			closing.setEnd(new Position((int) endLine, (int) endCol + 1));
+			closing.setStart(new Position((int) endLine, (int) endCol - 1));
+			closing.setEnd(new Position((int) endLine, (int) endCol));
 			ranges.add(closing);
 		}
 	}
