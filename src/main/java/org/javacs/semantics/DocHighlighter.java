@@ -17,6 +17,7 @@ import com.sun.source.doctree.LinkTree;
 import com.sun.source.doctree.LiteralTree;
 import com.sun.source.doctree.ParamTree;
 import com.sun.source.doctree.ProvidesTree;
+import com.sun.source.doctree.ReferenceTree;
 import com.sun.source.doctree.ReturnTree;
 import com.sun.source.doctree.SeeTree;
 import com.sun.source.doctree.SerialDataTree;
@@ -87,15 +88,17 @@ public class DocHighlighter extends DocTreeScanner <Void, JavadocHighlights> {
 		checker.checkCanceled();
 		final var start = positions.getStartPosition(root, doc, tree);
 		
-		final var startLine = lines.getLineNumber(start) - 1;
-		final var startCol = lines.getColumnNumber(start) - 1;
+		var startLine = lines.getLineNumber(start) - 1;
+		var startCol = lines.getColumnNumber(start) - 1;
 		
 		// Tag names are always on the same line
 		var endLine = startLine;
 		var endCol = startCol + name.length() + 1; // +1. Because startCol includes '@'
 		
 		if(tree instanceof InlineTagTree) {
-			endCol++; // InlineTagTree contains starting '{' in its range
+			// InlineTagTree contains starting '{' in its range
+			startCol ++;
+			endCol ++;
 		}
 		
 		checker.checkCanceled();
@@ -105,19 +108,6 @@ public class DocHighlighter extends DocTreeScanner <Void, JavadocHighlights> {
 		range.setEnd(new Position( (int) endLine, (int) endCol));
 		
 		ranges.add(range);
-		
-		if(tree instanceof InlineTagTree) {
-			// Highlight '}' of inline tag tree too
-			final var end = positions.getEndPosition(root, doc, tree);
-			
-			endLine = lines.getLineNumber(end) - 1;
-			endCol = lines.getColumnNumber(end) - 1;
-			
-			final var closing = new Range();
-			closing.setStart(new Position((int) endLine, (int) endCol - 1));
-			closing.setEnd(new Position((int) endLine, (int) endCol));
-			ranges.add(closing);
-		}
 	}
 	
 	@Override

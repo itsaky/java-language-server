@@ -146,6 +146,11 @@ class SemanticHighlighter extends TreePathScanner<Void, SemanticHighlight> {
     	final var path = getCurrentPath();
     	final var docs = DocTrees.instance(task.task);
     	final var element = docs.getElement(path);
+    	
+    	if(element == null) {
+    		return;
+    	}
+    	
     	final var doc = docs.getDocCommentTree(element);
     	
     	if(doc != null) {

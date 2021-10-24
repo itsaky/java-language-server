@@ -127,8 +127,6 @@ public class JavaLanguageServer implements IDELanguageServer, IDELanguageClientA
 	private JsonObject cacheSettings;
 	private JsonObject settings = new JsonObject();
 	private boolean modifiedBuild = true;
-	private boolean uncheckedChanges = false;
-    private Path lastEdited = Paths.get("");
 	
 	private static final Logger LOG = Logger.getLogger("main");
 	
@@ -386,15 +384,6 @@ public class JavaLanguageServer implements IDELanguageServer, IDELanguageClientA
         return canFindSource(rename.getEnclosingElement());
     }
     
-	public void doAsyncWork(boolean lintAllOpened) {
-	    try {
-	    	if (lintAllOpened || (uncheckedChanges && FileStore.activeDocuments().contains(lastEdited))) {
-            	lint(lintAllOpened ? FileStore.activeDocuments() : List.of(lastEdited));
-            	uncheckedChanges = false;
-        	}
-	    } catch (Throwable th) {}
-    }
-    
     private RegistrationParams registerClientCapabilities() {
 		var c = new RegistrationParams();
 		c.setRegistrations(didChangeRegistrations());
@@ -544,7 +533,7 @@ public class JavaLanguageServer implements IDELanguageServer, IDELanguageClientA
         LOG.info("Received java settings " + java);
         settings = java.getAsJsonObject();
         
-        doAsyncWork(true);
+        lint (FileStore.activeDocuments());
 	}
 	
 	@Override
@@ -740,8 +729,6 @@ public class JavaLanguageServer implements IDELanguageServer, IDELanguageClientA
 	@Override
 	public void didChange(DidChangeTextDocumentParams params) {
 		FileStore.change(params);
-        lastEdited = Paths.get(URI.create(params.getTextDocument().getUri()));
-        uncheckedChanges = true;
         lint(FileStore.activeDocuments());
 	}
 
@@ -756,9 +743,9 @@ public class JavaLanguageServer implements IDELanguageServer, IDELanguageClientA
 	@Override
 	public void didOpen(DidOpenTextDocumentParams params) {
 		FileStore.open(params);
-        if (!FileStore.isJavaFile(URI.create(params.getTextDocument().getUri()))) return;
-        lastEdited = Paths.get(URI.create(params.getTextDocument().getUri()));
-        uncheckedChanges = true;
+		final var file = Paths.get(URI.create(params.getTextDocument().getUri()));
+        if (!FileStore.isJavaFile(file)) return;
+        lint(List.of(file));
 	}
 
 	@Override
