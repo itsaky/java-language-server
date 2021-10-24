@@ -35,9 +35,7 @@ public class SemanticHighlightProvider {
             			docHighlighter.scan(doc, color.javadocs);
             		}
             	}
-            } catch (Throwable th) {
-            	th.printStackTrace();
-            }
+            } catch (Throwable th) {}
             
             colors.add(color);
         }

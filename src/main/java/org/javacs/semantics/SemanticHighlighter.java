@@ -22,6 +22,7 @@ import static org.javacs.services.JavaLanguageServer.*;
 
 class SemanticHighlighter extends TreePathScanner<Void, SemanticHighlight> {
     private final Trees trees;
+    private final DocTrees docTrees;
     private final CompileTask task;
     private final CompilationUnitTree root;
     private final CancelChecker checker;
@@ -33,6 +34,7 @@ class SemanticHighlighter extends TreePathScanner<Void, SemanticHighlight> {
         this.root = root;
         this.checker = checker;
         this.trees = Trees.instance(task.task);
+        this.docTrees = DocTrees.instance(task.task);
     }
     
     List<DocCommentTree> getDocs () {
@@ -45,6 +47,11 @@ class SemanticHighlighter extends TreePathScanner<Void, SemanticHighlight> {
         }
         checker.checkCanceled();
         var fromPath = getCurrentPath();
+        
+        // Cancel the visit in case a task was cancelled/closed
+        if(task == null || task.task == null) {
+        	throw new VisitFailedException();
+        }
         
         var toEl = trees.getElement(fromPath);
         if (toEl == null) {
@@ -144,14 +151,13 @@ class SemanticHighlighter extends TreePathScanner<Void, SemanticHighlight> {
     
     private void mayHaveDoc (SemanticHighlight highlights) {
     	final var path = getCurrentPath();
-    	final var docs = DocTrees.instance(task.task);
-    	final var element = docs.getElement(path);
+    	final var element = docTrees.getElement(path);
     	
     	if(element == null) {
     		return;
     	}
     	
-    	final var doc = docs.getDocCommentTree(element);
+    	final var doc = docTrees.getDocCommentTree(element);
     	
     	if(doc != null) {
     		this.docs.add(doc);
@@ -245,4 +251,7 @@ class SemanticHighlighter extends TreePathScanner<Void, SemanticHighlight> {
 	}
     
     private static final Logger LOG = Logger.getLogger("main");
+    
+    
+    class VisitFailedException extends RuntimeException {}
 }
