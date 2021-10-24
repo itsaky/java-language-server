@@ -212,7 +212,7 @@ class ReusableCompiler {
    	 public <T> void put(Key<T> key, Factory<T> fac) {
  	       try {
  	       	super.put(key, fac);
- 	       } catch (Exception e) {}
+ 	       } catch (AssertionError e) {}
 	    }
 
 	    /** Set the value for the key in this context. */
@@ -220,7 +220,7 @@ class ReusableCompiler {
  	   public <T> void put(Key<T> key, T data) {
 	        try {
  	       	super.put(key, data);
- 	       } catch (Exception e) {}
+ 	       } catch (AssertionError e) {}
 	    }
 
         <T> void drop(Key<T> k) {

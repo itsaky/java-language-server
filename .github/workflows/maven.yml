@@ -17,3 +17,9 @@ jobs:
           cache: maven
       - name: Build with Maven
         run: mvn --batch-mode --update-snapshots verify
+      - name: Upload JAR
+        uses: actions/upload-artifact@v2
+        if: ${{ !github.head_ref }}
+        with:
+          name: jls-SNAPSHOT
+          path: dist/classpath
