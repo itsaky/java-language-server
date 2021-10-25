@@ -131,6 +131,7 @@ public class JavaLanguageServer implements IDELanguageServer, IDELanguageClientA
 	private static final Logger LOG = Logger.getLogger("main");
 	
 	private CompletableFuture<Object> lastLintTask;
+	private CompletableFuture<Either<List<CompletionItem>, CompletionList>> lastCompletionRequest;
 	
 	public JavaLanguageServer () {
 	}
@@ -193,10 +194,17 @@ public class JavaLanguageServer implements IDELanguageServer, IDELanguageClientA
 	}
 	
 	private void cancelLint () {
+		cancelFutureQuietly(lastLintTask);
+	}
+	
+	private void cancelCompletion() {
+		cancelFutureQuietly(lastCompletionRequest);
+	}
+	
+	private void cancelFutureQuietly (CompletableFuture<?> future) {
 		try {
-			lastLintTask.cancel(true);
+			future.cancel(true);
 		} catch (Throwable th) {
-			// Ignored
 		}
 	}
 
@@ -509,7 +517,10 @@ public class JavaLanguageServer implements IDELanguageServer, IDELanguageClientA
 
 	@Override
 	public CompletableFuture<Either<List<CompletionItem>, CompletionList>> completion(CompletionParams params) {
-		return CompletableFutures.computeAsync(checker -> {
+		
+		cancelCompletion();
+		
+		return lastCompletionRequest = CompletableFutures.computeAsync(checker -> {
 			var file = Paths.get(URI.create(params.getTextDocument().getUri()));
         	var provider = new CompletionProvider(compiler());
 			var line = params.getPosition().getLine() + 1;
@@ -731,7 +742,6 @@ public class JavaLanguageServer implements IDELanguageServer, IDELanguageClientA
 	@Override
 	public void didChange(DidChangeTextDocumentParams params) {
 		FileStore.change(params);
-        lint(FileStore.activeDocuments());
 	}
 
 	@Override

@@ -2,18 +2,28 @@ package org.javacs;
 
 import com.sun.source.tree.*;
 import com.sun.source.util.*;
+
+import org.eclipse.lsp4j.jsonrpc.CompletableFutures;
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import javax.lang.model.util.*;
 import javax.tools.*;
 
 class CompileBatch implements AutoCloseable {
     static final int MAX_COMPLETION_ITEMS = 50;
-
+    
+    private static final Logger LOG = Logger.getLogger("main");
+    
+    
     final JavaCompilerService parent;
     final ReusableCompiler.Borrow borrow;
     /** Indicates the task that requested the compilation is finished with it. */
@@ -24,7 +34,7 @@ class CompileBatch implements AutoCloseable {
     final Elements elements;
     final Types types;
     final List<CompilationUnitTree> roots;
-
+    
     CompileBatch(JavaCompilerService parent, Collection<? extends JavaFileObject> files) {
         this.parent = parent;
         this.borrow = batchTask(parent, files);
@@ -33,24 +43,38 @@ class CompileBatch implements AutoCloseable {
         this.elements = borrow.task.getElements();
         this.types = borrow.task.getTypes();
         this.roots = new ArrayList<>();
+        
         // Compile all roots
         try {
-            for (var t : borrow.task.parse()) {
-                roots.add(t);
+            
+            final var iterator = borrow.task.parse().iterator();
+            while (!closed && iterator.hasNext()) {
+            	roots.add(iterator.next());
             }
+            
+            // Return if closed
+            if(closed) {
+            	return;
+            }
+            
             // The results of borrow.task.analyze() are unreliable when errors are present
             // You can get at `Element` values using `Trees`
             borrow.task.analyze();
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            LOG.log(Level.SEVERE, "Cannot create CompileBatch");
+            e.printStackTrace();
         }
     }
-
+    
     /**
      * If the compilation failed because javac didn't find some package-private files in source files with different
      * names, list those source files.
      */
     Set<Path> needsAdditionalSources() {
+        
+        if(closed)
+        	return Set.of();
+        
         // Check for "class not found errors" that refer to package private classes
         var addFiles = new HashSet<Path>();
         for (var err : parent.diags) {

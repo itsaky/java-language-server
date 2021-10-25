@@ -16,7 +16,7 @@ public class JavaCompilerService implements CompilerProvider {
     final Docs docs;
     final Set<String> jdkClasses = new HashSet<String>(), classPathClasses;
     // Diagnostics from the last compilation task
-    final List<Diagnostic<? extends JavaFileObject>> diags = new ArrayList<>();
+    final List<Diagnostic<? extends JavaFileObject>> diags = Collections.synchronizedList(new ArrayList<>());
     // Use the same file manager for multiple tasks, so we don't repeatedly re-compile the same files
     // TODO intercept files that aren't in the batch and erase method bodies so compilation is faster
     final SourceFileManager fileManager;
