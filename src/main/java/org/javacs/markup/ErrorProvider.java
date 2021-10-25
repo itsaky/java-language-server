@@ -11,23 +11,28 @@ import java.util.regex.Pattern;
 import javax.lang.model.element.Element;
 import javax.tools.JavaFileObject;
 import org.javacs.CompileTask;
-import org.javacs.CompilerProvider;
 import org.javacs.FileStore;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 
 public class ErrorProvider {
     private final CompileTask task;
-    private final CompilerProvider compiler;
     private final CancelChecker checker;
     
-    public ErrorProvider(CompilerProvider compiler, CompileTask task, CancelChecker checker) {
-        this.compiler = compiler;
+    public ErrorProvider(CompileTask task, CancelChecker checker) {
         this.task = task;
         this.checker = checker;
     }
-
+    
     public PublishDiagnosticsParams[] errors() {
+    	try {
+    		return errorsInternal();
+    	} catch (Throwable th) {
+    		return new PublishDiagnosticsParams[0];
+    	}
+    }
+    
+    private final PublishDiagnosticsParams[] errorsInternal() {
         if(!isTaskValid(task)) return new PublishDiagnosticsParams[0];
         var result = new PublishDiagnosticsParams[task.roots.size()];
         for (var i = 0; i < task.roots.size(); i++) {

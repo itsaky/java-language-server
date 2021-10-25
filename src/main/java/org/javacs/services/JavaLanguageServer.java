@@ -3,8 +3,6 @@ package org.javacs.services;
 import java.net.URI;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.Duration;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -13,8 +11,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
 
 import javax.lang.model.element.Element;
@@ -23,8 +21,6 @@ import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 
 import com.google.gson.JsonObject;
-import com.itsaky.lsp.SemanticHighlight;
-import com.itsaky.lsp.SemanticHighlightsParams;
 import com.itsaky.lsp.services.IDELanguageClient;
 import com.itsaky.lsp.services.IDELanguageClientAware;
 import com.itsaky.lsp.services.IDELanguageServer;
@@ -123,11 +119,11 @@ import org.javacs.semantics.SemanticHighlightProvider;
 public class JavaLanguageServer implements IDELanguageServer, IDELanguageClientAware, IDETextDocumentService, IDEWorkspaceService {
 	
 	private IDELanguageClient client;
-	private JavaCompilerService cacheCompiler;
+	private JavaCompilerService commonCompilerService;
+	private JavaCompilerService lintCompilerService;
 	private JsonObject cacheSettings;
 	private JsonObject settings = new JsonObject();
 	private boolean modifiedBuild = true;
-	
 	private static final Logger LOG = Logger.getLogger("main");
 	
 	private CompletableFuture<Object> lastLintTask;
@@ -138,11 +134,20 @@ public class JavaLanguageServer implements IDELanguageServer, IDELanguageClientA
 	
 	JavaCompilerService compiler() {
 		if (needsCompiler()) {
-			cacheCompiler = createCompiler();
+			commonCompilerService = createCompiler();
 			cacheSettings = settings;
 			modifiedBuild = false;
 		}
-		return cacheCompiler;
+		return commonCompilerService;
+	}
+	
+	JavaCompilerService lintCompiler() {
+		if(needsCompiler()) {
+			lintCompilerService = createCompiler();
+			cacheSettings = settings;
+		}
+		
+		return lintCompilerService;
 	}
 
 	private boolean needsCompiler() {
@@ -155,6 +160,32 @@ public class JavaLanguageServer implements IDELanguageServer, IDELanguageClientA
 		}
 		return false;
 	}
+	
+	private JavaCompilerService createCompiler() {
+		var classPath = classPath();
+		var addExports = addExports();
+		return new JavaCompilerService(classPath, Collections.emptySet(), addExports);
+	}
+	
+	private Set<Path> classPath() {
+		if (!settings.has("classPath")) return Set.of();
+		var array = settings.getAsJsonArray("classPath");
+		Set<Path> paths = ConcurrentHashMap.newKeySet();
+		for (var each : array) {
+			paths.add(Paths.get(each.getAsString()).toAbsolutePath());
+		}
+		return paths;
+	}
+
+	private Set<String> addExports() {
+		if (!settings.has("addExports")) return Set.of();
+		var array = settings.getAsJsonArray("addExports");
+		Set<String> strings = ConcurrentHashMap.newKeySet();
+		for (var each : array) {
+			strings.add(each.getAsString());
+		}
+		return strings;
+	}
 
 	public CompletableFuture<Object> lint(Collection<Path> files) {
 		
@@ -162,41 +193,22 @@ public class JavaLanguageServer implements IDELanguageServer, IDELanguageClientA
 		
 		return lastLintTask = CompletableFutures.computeAsync(checker -> {
 			if (files.isEmpty()) return null;
-			LOG.info("Lint " + files.size() + " files...");
-			var started = Instant.now();
-			try (var task = compiler().compile(files.toArray(Path[]::new))) {
-				var compiled = Instant.now();
-				try {
-					LOG.info("...compiled in " + Duration.between(started, compiled).toMillis() + " ms");
-					for (var errs : new ErrorProvider(compiler(), task, checker).errors()) {
-						client.publishDiagnostics(errs);
-					}
-					var published = Instant.now();
-					LOG.info("...published in " + Duration.between(started, published).toMillis() + " ms");
-				} catch (Throwable th) {
-					th.printStackTrace();
-					CrashHandler.logCrash(th);
+			try (var task = lintCompiler().compile(files.toArray(Path[]::new))) {
+				for (var errs : new ErrorProvider(task, checker).errors()) {
+					client.publishDiagnostics(errs);
 				}
-				try {
-					for(var highlight : new SemanticHighlightProvider(task, checker).highlights()) {
-						client.semanticHighlights(highlight);
-					}
-				} catch (Throwable th) {
-					th.printStackTrace();
-					CrashHandler.logCrash(th);
+				for(var highlight : new SemanticHighlightProvider(task, checker).highlights()) {
+					client.semanticHighlights(highlight);
 				}
-			} catch (CancellationException e) {
-				e.printStackTrace();
 			}
-			
 			return null;
 		});
 	}
 	
 	private void cancelLint () {
 		cancelFutureQuietly(lastLintTask);
-	}
-	
+		}
+		
 	private void cancelCompletion() {
 		cancelFutureQuietly(lastCompletionRequest);
 	}
@@ -207,45 +219,7 @@ public class JavaLanguageServer implements IDELanguageServer, IDELanguageClientA
 		} catch (Throwable th) {
 		}
 	}
-
-	private JavaCompilerService createCompiler() {
-		var classPath = classPath();
-		var addExports = addExports();
-		// Don't infer anything. Expect classpath from language client
-		// This is because AndroidIDE gets all classpaths from Gradle task
-		return new JavaCompilerService(classPath, Collections.emptySet(), addExports);
-	}
-
-	private Set<String> externalDependencies() {
-		if (!settings.has("externalDependencies")) return Set.of();
-		var array = settings.getAsJsonArray("externalDependencies");
-		var strings = new HashSet<String>();
-		for (var each : array) {
-			strings.add(each.getAsString());
-		}
-		return strings;
-	}
-
-	private Set<Path> classPath() {
-		if (!settings.has("classPath")) return Set.of();
-		var array = settings.getAsJsonArray("classPath");
-		var paths = new HashSet<Path>();
-		for (var each : array) {
-			paths.add(Paths.get(each.getAsString()).toAbsolutePath());
-		}
-		return paths;
-	}
-
-	private Set<String> addExports() {
-		if (!settings.has("addExports")) return Set.of();
-		var array = settings.getAsJsonArray("addExports");
-		var strings = new HashSet<String>();
-		for (var each : array) {
-			strings.add(each.getAsString());
-		}
-		return strings;
-	}
-
+	
 	private WorkspaceServerCapabilities workspaceCapabilities() {
 		var c = new WorkspaceServerCapabilities();
 		c.setFileOperations(fileOperationCapabilities());
@@ -742,6 +716,10 @@ public class JavaLanguageServer implements IDELanguageServer, IDELanguageClientA
 	@Override
 	public void didChange(DidChangeTextDocumentParams params) {
 		FileStore.change(params);
+		final var file = Paths.get(URI.create(params.getTextDocument().getUri()));
+		if(FileStore.isJavaFile(file)) {
+			lint(List.of(file));
+		}
 	}
 
 	@Override
@@ -765,20 +743,6 @@ public class JavaLanguageServer implements IDELanguageServer, IDELanguageClientA
 		if (FileStore.isJavaFile(URI.create(params.getTextDocument().getUri()))) {
             lint(FileStore.activeDocuments());
         }
-	}
-	
-	@Override
-	public CompletableFuture<List<SemanticHighlight>> semanticHighlights(SemanticHighlightsParams params) {
-		return CompletableFutures.computeAsync(checker -> {
-			var file = Paths.get(URI.create(params.getTextDocument().getUri()));
-			if(!FileStore.isJavaFile(file)) {
-				throw new IllegalArgumentException("File is not a java file");
-			}
-			try (var task = compiler().compile(file)) {
-				var provider = new SemanticHighlightProvider(task, checker);
-				return provider.highlights();
-			}
-		});
 	}
 	
 	public static final Position Position_NONE = new Position(-1, -1);

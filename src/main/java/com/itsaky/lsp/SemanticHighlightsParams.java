@@ -6,7 +6,6 @@ public class SemanticHighlightsParams {
   
   private TextDocumentIdentifier _textDocument;
   
-  
   public TextDocumentIdentifier getTextDocument() {
     return this._textDocument;
   }

@@ -18,8 +18,16 @@ public class SemanticHighlightProvider {
         this.task = task;
         this.checker = checker;
     }
-
+    
     public List<SemanticHighlight> highlights() {
+    	try {
+    		return highlightsInternal();
+    	} catch (Throwable th) {
+    		return List.of();
+    	}
+    }
+
+    private List<SemanticHighlight> highlightsInternal() {
         var colors = new ArrayList<SemanticHighlight>(task.roots.size());
         for (int i = 0; i < task.roots.size(); i++) {
             final var root = task.roots.get(i);
@@ -27,7 +35,7 @@ public class SemanticHighlightProvider {
             color.uri = root.getSourceFile().toUri().toString();
             try {
             	if(task == null || task.task == null) break;
-            	final var highlighter = new SemanticHighlighter(task, root, checker);
+            	final var highlighter = new SemanticHighlighter(task, checker);
             	highlighter.scan (root, color);
             	if(!highlighter.getDocs().isEmpty()) {
             		for (var doc : highlighter.getDocs()) {

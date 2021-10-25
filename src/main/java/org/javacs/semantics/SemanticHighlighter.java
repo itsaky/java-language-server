@@ -21,17 +21,16 @@ import static javax.lang.model.element.ElementKind.*;
 import static org.javacs.services.JavaLanguageServer.*;
 
 class SemanticHighlighter extends TreePathScanner<Void, SemanticHighlight> {
+    
     private final Trees trees;
     private final DocTrees docTrees;
     private final CompileTask task;
-    private final CompilationUnitTree root;
     private final CancelChecker checker;
     
     private final List<DocCommentTree> docs = new ArrayList<>();
     
-    SemanticHighlighter(CompileTask task, CompilationUnitTree root, CancelChecker checker) {
+    SemanticHighlighter(CompileTask task, CancelChecker checker) {
         this.task = task;
-        this.root = root;
         this.checker = checker;
         this.trees = Trees.instance(task.task);
         this.docTrees = DocTrees.instance(task.task);

@@ -24,6 +24,7 @@ import java.util.Objects;
 import java.util.function.Predicate;
 import java.util.logging.Logger;
 import java.util.Collections;
+
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
@@ -34,6 +35,7 @@ import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeVariable;
+
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
@@ -134,7 +136,7 @@ public class CompletionProvider {
         var cursor = task.root.getLineMap().getPosition(line, column);
         var contents = new PruneMethodBodies(task.task).scan(task.root, cursor);
         var endOfLine = endOfLine(contents, (int) cursor);
-        LOG.info("endOfLine: " + endOfLine);
+        
         checker.checkCanceled();
         
         contents.insert(endOfLine, ';');

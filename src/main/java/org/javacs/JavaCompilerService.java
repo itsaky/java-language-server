@@ -22,18 +22,9 @@ public class JavaCompilerService implements CompilerProvider {
     final SourceFileManager fileManager;
 
     public JavaCompilerService(Set<Path> classPath, Set<Path> docPath, Set<String> addExports) {
-        System.err.println("Class path:");
-        for (var p : classPath) {
-            System.err.println("  " + p);
-        }
-        System.err.println("Doc path:");
-        for (var p : docPath) {
-            System.err.println("  " + p);
-        }
-        // classPath can't actually be modified, because JavaCompiler remembers it from task to task
-        this.classPath = Collections.unmodifiableSet(classPath);
-        this.docPath = Collections.unmodifiableSet(docPath);
-        this.addExports = Collections.unmodifiableSet(addExports);
+        this.classPath = classPath;
+        this.docPath = docPath;
+        this.addExports = addExports;
         this.docs = new Docs(docPath);
         this.classPathClasses = ScanClassPath.classPathTopLevelClasses(classPath);
         this.fileManager = new SourceFileManager();
