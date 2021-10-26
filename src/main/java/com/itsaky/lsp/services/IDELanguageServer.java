@@ -10,8 +10,6 @@ import org.eclipse.lsp4j.WorkDoneProgressCancelParams;
 import org.eclipse.lsp4j.jsonrpc.services.JsonDelegate;
 import org.eclipse.lsp4j.jsonrpc.services.JsonNotification;
 import org.eclipse.lsp4j.jsonrpc.services.JsonRequest;
-import org.eclipse.lsp4j.services.TextDocumentService;
-import org.eclipse.lsp4j.services.WorkspaceService;
 
 /**
  * Custom implementation of {@link org.eclipse.lsp4j.services.LanguageServer}.

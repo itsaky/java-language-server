@@ -91,7 +91,6 @@ import org.eclipse.lsp4j.jsonrpc.CompletableFutures;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.javacs.CompileTask;
 import org.javacs.CompilerProvider;
-import org.javacs.CrashHandler;
 import org.javacs.FileStore;
 import org.javacs.FindHelper;
 import org.javacs.FindNameAt;
@@ -403,6 +402,7 @@ public class JavaLanguageServer implements IDELanguageServer, IDELanguageClientA
 	@Override
 	public void exit() {
 		cancelLint();
+		cancelCompletion();
 		Main.exit();
 	}
 

@@ -49,7 +49,7 @@ class SemanticHighlighter extends TreePathScanner<Void, SemanticHighlight> {
         
         // Cancel the visit in case a task was cancelled/closed
         if(task == null || task.task == null) {
-        	throw new VisitFailedException();
+        	throw new RuntimeException("Task is null");
         }
         
         var toEl = trees.getElement(fromPath);
@@ -213,7 +213,6 @@ class SemanticHighlighter extends TreePathScanner<Void, SemanticHighlight> {
 
     @Override
     public Void visitClass(ClassTree t, SemanticHighlight colors) {
-        LOG.info ("visitClass: " + t.getSimpleName());
         putSemantics(t.getSimpleName(), colors);
         mayHaveDoc(colors);
         
@@ -243,7 +242,6 @@ class SemanticHighlighter extends TreePathScanner<Void, SemanticHighlight> {
     
     @Override
     public Void visitMethod(MethodTree tree, SemanticHighlight colors) {
-    	LOG.info("visitMethod: " + tree.getName());
     	mayHaveDoc(colors);
     	putSemantics(tree.getName(), colors);
 		return super.visitMethod(tree, colors);
@@ -252,5 +250,4 @@ class SemanticHighlighter extends TreePathScanner<Void, SemanticHighlight> {
     private static final Logger LOG = Logger.getLogger("main");
     
     
-    class VisitFailedException extends RuntimeException {}
 }
