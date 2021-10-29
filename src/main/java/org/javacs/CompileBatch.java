@@ -139,11 +139,8 @@ class CompileBatch implements AutoCloseable {
 
         Collections.addAll(list, "-classpath", joinPath(classPath));
         Collections.addAll(list, "--add-modules", "ALL-MODULE-PATH");
-        // Collections.addAll(list, "-verbose");
         Collections.addAll(list, "-proc:none");
         Collections.addAll(list, "-g");
-        // You would think we could do -Xlint:all,
-        // but some lints trigger fatal errors in the presence of parse errors
         Collections.addAll(
                 list,
                 "-Xlint:cast",
@@ -155,6 +152,7 @@ class CompileBatch implements AutoCloseable {
                 "-Xlint:unchecked",
                 "-Xlint:varargs",
                 "-Xlint:static");
+        
         for (var export : addExports) {
             list.add("--add-exports");
             list.add(export + "=ALL-UNNAMED");

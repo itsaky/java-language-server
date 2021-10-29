@@ -590,7 +590,14 @@ public class JavaLanguageServer implements IDELanguageServer, IDELanguageClientA
         var column = params.getPosition().getCharacter() + 1;
         var provider = new SignatureProvider(compiler());
         return CompletableFutures.computeAsync(checker -> {
-        	return provider.signatureHelp(checker, file, line, column);
+        	var help = provider.signatureHelp(checker, file, line, column);
+        	if (help == null) {
+        		help = new SignatureHelp();
+        		help.setActiveParameter(-1);
+        		help.setActiveSignature(-1);
+        		help.setSignatures(List.of());
+        	}
+        	return help;
         });
 	}
 

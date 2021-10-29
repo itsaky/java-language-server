@@ -37,8 +37,16 @@ public class SignatureProvider {
     public SignatureProvider(CompilerProvider compiler) {
         this.compiler = compiler;
     }
-
+    
     public SignatureHelp signatureHelp(CancelChecker checker, Path file, int line, int column) {
+    	try {
+    		return signatureHelpInternal(checker, file, line, column);
+    	} catch (Throwable th) {
+    		return null;
+    	}
+    }
+
+    private SignatureHelp signatureHelpInternal(CancelChecker checker, Path file, int line, int column) {
         // TODO prune
         try (var task = compiler.compile(file)) {
             checker.checkCanceled();
