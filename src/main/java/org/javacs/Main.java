@@ -8,7 +8,6 @@ import java.util.logging.Logger;
 import com.itsaky.lsp.services.IDELanguageClient;
 
 import org.eclipse.lsp4j.jsonrpc.Launcher;
-import org.eclipse.lsp4j.services.LanguageClient;
 import org.javacs.launch.JLSLauncher;
 import org.javacs.services.JavaLanguageServer;
 

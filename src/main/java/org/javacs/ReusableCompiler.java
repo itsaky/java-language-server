@@ -23,7 +23,6 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
-
 package org.javacs;
 
 import com.sun.source.util.JavacTask;
@@ -82,7 +81,8 @@ import javax.tools.JavaFileObject;
 class ReusableCompiler {
 
 	private static final Logger LOG = Logger.getLogger("main");
-	private static final JavacTool systemProvider = JavacTool.create();
+	
+	static final JavacTool systemProvider = JavacTool.create();
 
 	private List<String> currentOptions = new ArrayList<>();
 	private ReusableContext currentContext;

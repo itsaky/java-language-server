@@ -161,14 +161,25 @@ public class JavaLanguageServer implements IDELanguageServer, IDELanguageClientA
 	}
 	
 	private JavaCompilerService createCompiler() {
-		var classPath = classPath();
-		var addExports = addExports();
-		return new JavaCompilerService(classPath, Collections.emptySet(), addExports);
+		final var classPath = classPath();
+		final var bootClassPath = bootClassPath();
+		final var addExports = addExports();
+		return new JavaCompilerService(classPath, bootClassPath, Collections.emptySet(), addExports);
 	}
 	
 	private Set<Path> classPath() {
 		if (!settings.has("classPath")) return Set.of();
 		var array = settings.getAsJsonArray("classPath");
+		Set<Path> paths = ConcurrentHashMap.newKeySet();
+		for (var each : array) {
+			paths.add(Paths.get(each.getAsString()).toAbsolutePath());
+		}
+		return paths;
+	}
+	
+	private Set<Path> bootClassPath() {
+		if (!settings.has("bootClassPath")) return Set.of();
+		var array = settings.getAsJsonArray("bootClassPath");
 		Set<Path> paths = ConcurrentHashMap.newKeySet();
 		for (var each : array) {
 			paths.add(Paths.get(each.getAsString()).toAbsolutePath());

@@ -14,7 +14,7 @@ class SourceFileManager extends ForwardingJavaFileManager<StandardJavaFileManage
     }
 
     private static StandardJavaFileManager createDelegateFileManager() {
-        var compiler = ServiceLoader.load(JavaCompiler.class).iterator().next();
+        var compiler = ReusableCompiler.systemProvider;
         return compiler.getStandardFileManager(SourceFileManager::logError, null, Charset.defaultCharset());
     }
 

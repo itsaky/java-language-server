@@ -1,5 +1,0 @@
-rm -rvf dist/classpath
-mvn package -DskipTests
-mv dist/classpath/g* dist/classpath/gson.jar
-mv dist/classpath/p* dist/classpath/protobuf.jar
-mv dist/classpath/j* dist/classpath/jls.jar
