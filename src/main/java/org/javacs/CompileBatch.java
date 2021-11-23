@@ -16,12 +16,11 @@ import javax.tools.*;
 
 class CompileBatch implements AutoCloseable {
     static final int MAX_COMPLETION_ITEMS = 50;
-    
     private static final Logger LOG = Logger.getLogger("main");
-    
     
     final JavaCompilerService parent;
     final ReusableCompiler.Borrow borrow;
+    
     /** Indicates the task that requested the compilation is finished with it. */
     boolean closed;
 

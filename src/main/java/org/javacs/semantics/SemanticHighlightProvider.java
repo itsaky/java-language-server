@@ -57,12 +57,6 @@ public class SemanticHighlightProvider {
             	if(task == null || task.task == null) break;
             	final var highlighter = new SemanticHighlighter(task, checker);
             	highlighter.scan (root, color);
-            	if(!highlighter.getDocs().isEmpty()) {
-            		for (var doc : highlighter.getDocs()) {
-            			final var docHighlighter = new DocHighlighter(task, root, doc, checker);
-            			docHighlighter.scan(doc, color.javadocs);
-            		}
-            	}
             } catch (Throwable th) {}
             
             colors.add(color);

@@ -47,6 +47,4 @@ public class SemanticHighlight {
         instanceInits = new ArrayList<>(),
         typeParams = new ArrayList<>(),
         resourceVariables = new ArrayList<>();
-        
-    public final JavadocHighlights javadocs = new JavadocHighlights();
 }

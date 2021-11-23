@@ -43,21 +43,13 @@ import static org.javacs.services.JavaLanguageServer.*;
 class SemanticHighlighter extends TreePathScanner<Void, SemanticHighlight> {
     
     private final Trees trees;
-    private final DocTrees docTrees;
     private final CompileTask task;
     private final CancelChecker checker;
-    
-    private final List<DocCommentTree> docs = new ArrayList<>();
     
     SemanticHighlighter(CompileTask task, CancelChecker checker) {
         this.task = task;
         this.checker = checker;
         this.trees = Trees.instance(task.task);
-        this.docTrees = DocTrees.instance(task.task);
-    }
-    
-    List<DocCommentTree> getDocs () {
-    	return docs;
     }
     
     private void putSemantics(Name name, SemanticHighlight colors) {
@@ -168,21 +160,6 @@ class SemanticHighlighter extends TreePathScanner<Void, SemanticHighlight> {
         }
     }
     
-    private void mayHaveDoc (SemanticHighlight highlights) {
-    	final var path = getCurrentPath();
-    	final var element = docTrees.getElement(path);
-    	
-    	if(element == null) {
-    		return;
-    	}
-    	
-    	final var doc = docTrees.getDocCommentTree(element);
-    	
-    	if(doc != null) {
-    		this.docs.add(doc);
-    	}
-    }
-
     private Range find(TreePath path, Name name) {
         // Find region containing name
         checker.checkCanceled();
@@ -227,14 +204,12 @@ class SemanticHighlighter extends TreePathScanner<Void, SemanticHighlight> {
     @Override
     public Void visitVariable(VariableTree t, SemanticHighlight colors) {
         putSemantics(t.getName(), colors);
-        mayHaveDoc(colors);
         return super.visitVariable(t, colors);
     }
 
     @Override
     public Void visitClass(ClassTree t, SemanticHighlight colors) {
         putSemantics(t.getSimpleName(), colors);
-        mayHaveDoc(colors);
         
         return super.visitClass (t, colors);
     }
@@ -262,12 +237,9 @@ class SemanticHighlighter extends TreePathScanner<Void, SemanticHighlight> {
     
     @Override
     public Void visitMethod(MethodTree tree, SemanticHighlight colors) {
-    	mayHaveDoc(colors);
     	putSemantics(tree.getName(), colors);
 		return super.visitMethod(tree, colors);
 	}
-    
+	
     private static final Logger LOG = Logger.getLogger("main");
-    
-    
 }
