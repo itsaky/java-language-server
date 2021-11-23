@@ -121,7 +121,7 @@ class CompileBatch implements AutoCloseable {
     private static ReusableCompiler.Borrow batchTask(
             JavaCompilerService parent, Collection<? extends JavaFileObject> sources) {
         parent.diags.clear();
-        var options = options(parent.classPath, parent.bootClassPath, parent.addExports);
+        var options = options(parent.classPath, parent.addExports);
         return parent.compiler.getTask(parent.fileManager, parent.diags::add, options, List.of(), sources);
     }
 
@@ -130,12 +130,8 @@ class CompileBatch implements AutoCloseable {
         return classOrSourcePath.stream().map(Path::toString).collect(Collectors.joining(File.pathSeparator));
     }
 
-    private static List<String> options(Set<Path> classPath, Set<Path> bootclasspath, Set<String> addExports) {
+    private static List<String> options(Set<Path> classPath, Set<String> addExports) {
         var list = new ArrayList<String>();
-        
-        if (bootclasspath != null && !bootclasspath.isEmpty()) {
-        	Collections.addAll(list, "-bootclasspath", joinPath(bootclasspath));
-        }
         
         Collections.addAll(list, "-classpath", joinPath(classPath));
         Collections.addAll(list, "--add-modules", "ALL-MODULE-PATH");

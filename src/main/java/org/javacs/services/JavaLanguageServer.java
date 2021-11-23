@@ -1,3 +1,23 @@
+/************************************************************************************
+ * This file is part of Java Language Server (https://github.com/itsaky/java-language-server)
+ *
+ * Copyright (C) 2021 Akash Yadav
+ *
+ * Java Language Server is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ * 
+ * Java Language Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with Java Language Server.  If not, see <https://www.gnu.org/licenses/>.
+ *
+**************************************************************************************/
+
 package org.javacs.services;
 
 import java.net.URI;
@@ -162,24 +182,13 @@ public class JavaLanguageServer implements IDELanguageServer, IDELanguageClientA
 	
 	private JavaCompilerService createCompiler() {
 		final var classPath = classPath();
-		final var bootClassPath = bootClassPath();
 		final var addExports = addExports();
-		return new JavaCompilerService(classPath, bootClassPath, Collections.emptySet(), addExports);
+		return new JavaCompilerService(classPath, Collections.emptySet(), addExports);
 	}
 	
 	private Set<Path> classPath() {
 		if (!settings.has("classPath")) return Set.of();
 		var array = settings.getAsJsonArray("classPath");
-		Set<Path> paths = ConcurrentHashMap.newKeySet();
-		for (var each : array) {
-			paths.add(Paths.get(each.getAsString()).toAbsolutePath());
-		}
-		return paths;
-	}
-	
-	private Set<Path> bootClassPath() {
-		if (!settings.has("bootClassPath")) return Set.of();
-		var array = settings.getAsJsonArray("bootClassPath");
 		Set<Path> paths = ConcurrentHashMap.newKeySet();
 		for (var each : array) {
 			paths.add(Paths.get(each.getAsString()).toAbsolutePath());
