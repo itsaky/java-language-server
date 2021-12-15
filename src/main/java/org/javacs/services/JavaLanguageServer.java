@@ -3,18 +3,18 @@
  *
  * Copyright (C) 2021 Akash Yadav
  *
- * Java Language Server is free software: you can redistribute it and/or modify
+ * AndroidIDE is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  * 
- * Java Language Server is distributed in the hope that it will be useful,
+ * AndroidIDE is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  * 
  * You should have received a copy of the GNU General Public License
- * along with Java Language Server.  If not, see <https://www.gnu.org/licenses/>.
+ * along with AndroidIDE.  If not, see <https://www.gnu.org/licenses/>.
  *
 **************************************************************************************/
 
@@ -41,6 +41,8 @@ import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 
 import com.google.gson.JsonObject;
+import com.itsaky.lsp.SemanticHighlight;
+import com.itsaky.lsp.SemanticHighlightsParams;
 import com.itsaky.lsp.services.IDELanguageClient;
 import com.itsaky.lsp.services.IDELanguageClientAware;
 import com.itsaky.lsp.services.IDELanguageServer;
@@ -108,7 +110,10 @@ import org.eclipse.lsp4j.WorkspaceFoldersOptions;
 import org.eclipse.lsp4j.WorkspaceServerCapabilities;
 import org.eclipse.lsp4j.WorkspaceSymbolParams;
 import org.eclipse.lsp4j.jsonrpc.CompletableFutures;
+import org.eclipse.lsp4j.jsonrpc.ResponseErrorException;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
+import org.eclipse.lsp4j.jsonrpc.messages.ResponseError;
+import org.eclipse.lsp4j.jsonrpc.messages.ResponseErrorCode;
 import org.javacs.CompileTask;
 import org.javacs.CompilerProvider;
 import org.javacs.FileStore;
@@ -134,6 +139,7 @@ import org.javacs.rewrite.RenameMethod;
 import org.javacs.rewrite.RenameVariable;
 import org.javacs.rewrite.Rewrite;
 import org.javacs.semantics.SemanticHighlightProvider;
+import org.jetbrains.annotations.NotNull;
 
 public class JavaLanguageServer implements IDELanguageServer, IDELanguageClientAware, IDETextDocumentService, IDEWorkspaceService {
 	
@@ -142,7 +148,10 @@ public class JavaLanguageServer implements IDELanguageServer, IDELanguageClientA
 	private JavaCompilerService lintCompilerService;
 	private JsonObject cacheSettings;
 	private JsonObject settings = new JsonObject();
-	private boolean modifiedBuild = true;
+	
+	private boolean createCommonCompiler = true;
+	private boolean createLintCompiler = true;
+	
 	private static final Logger LOG = Logger.getLogger("main");
 	
 	private CompletableFuture<Object> lastLintTask;
@@ -152,31 +161,45 @@ public class JavaLanguageServer implements IDELanguageServer, IDELanguageClientA
 	}
 	
 	JavaCompilerService compiler() {
-		if (needsCompiler()) {
+		if (shouldCreateCommonCompiler()) {
 			commonCompilerService = createCompiler();
 			cacheSettings = settings;
-			modifiedBuild = false;
+			createCommonCompiler = false;
 		}
+		
 		return commonCompilerService;
 	}
 	
 	JavaCompilerService lintCompiler() {
-		if(needsCompiler()) {
+		if(shouldCreateLintCompiler()) {
 			lintCompilerService = createCompiler();
 			cacheSettings = settings;
+			createLintCompiler = false;
 		}
 		
 		return lintCompilerService;
 	}
 
-	private boolean needsCompiler() {
-		if (modifiedBuild) {
+	private boolean shouldCreateCommonCompiler() {
+		if (createCommonCompiler) {
 			return true;
 		}
+		
 		if (!settings.equals(cacheSettings)) {
-			LOG.info("Settings\n\t" + settings + "\nis different than\n\t" + cacheSettings);
 			return true;
 		}
+		return false;
+	}
+	
+	private boolean shouldCreateLintCompiler () {
+		if (createLintCompiler) {
+			return true;
+		}
+		
+		if (!settings.equals(cacheSettings)) {
+			return true;
+		}
+		
 		return false;
 	}
 	
@@ -216,9 +239,9 @@ public class JavaLanguageServer implements IDELanguageServer, IDELanguageClientA
 				for (var errs : new ErrorProvider(task, checker).errors()) {
 					client.publishDiagnostics(errs);
 				}
-				for(var highlight : new SemanticHighlightProvider(task, checker).highlights()) {
-					client.semanticHighlights(highlight);
-				}
+				// for(var highlight : new SemanticHighlightProvider(task, checker).highlights()) {
+				// 	client.semanticHighlights(highlight);
+				// }
 			}
 			return null;
 		});
@@ -226,7 +249,7 @@ public class JavaLanguageServer implements IDELanguageServer, IDELanguageClientA
 	
 	private void cancelLint () {
 		cancelFutureQuietly(lastLintTask);
-		}
+	}
 		
 	private void cancelCompletion() {
 		cancelFutureQuietly(lastCompletionRequest);
@@ -236,6 +259,7 @@ public class JavaLanguageServer implements IDELanguageServer, IDELanguageClientA
 		try {
 			future.cancel(true);
 		} catch (Throwable th) {
+			// ignored
 		}
 	}
 	
@@ -512,9 +536,13 @@ public class JavaLanguageServer implements IDELanguageServer, IDELanguageClientA
 	@Override
 	public CompletableFuture<Either<List<CompletionItem>, CompletionList>> completion(CompletionParams params) {
 		
+		LOG.info ("Got completion request");
 		cancelCompletion();
+		LOG.info ("cancelCompletion()");
 		
 		return lastCompletionRequest = CompletableFutures.computeAsync(checker -> {
+			
+			LOG.info ("Inside completion future");
 			var file = Paths.get(URI.create(params.getTextDocument().getUri()));
         	var provider = new CompletionProvider(compiler());
 			var line = params.getPosition().getLine() + 1;
@@ -522,6 +550,8 @@ public class JavaLanguageServer implements IDELanguageServer, IDELanguageClientA
         	if (!FileStore.isJavaFile(URI.create(params.getTextDocument().getUri()))) {
 		    	throw new IllegalArgumentException("Cannot execute further. File must be a Java file.");
 			}
+			
+			LOG.info ("Calling CompletionProvider.complete()");
 			return provider.complete(checker, file, line, character);
 		});
 	}
@@ -566,7 +596,7 @@ public class JavaLanguageServer implements IDELanguageServer, IDELanguageClientA
                 case "BUILD":
                 case "pom.xml":
                     LOG.info("Compiler needs to be re-created because " + file + " has changed");
-                    modifiedBuild = true;
+                    createCommonCompiler = createLintCompiler	 = true;
             }
         }
 	}
@@ -687,7 +717,7 @@ public class JavaLanguageServer implements IDELanguageServer, IDELanguageClientA
 	}
 	
 	@Override
-	public CompletableFuture<Either<Range, PrepareRenameResult>> prepareRename(PrepareRenameParams params) {
+	public CompletableFuture<Either<Range, PrepareRenameResult>> prepareRename(@NotNull PrepareRenameParams params) {
 		if (!FileStore.isJavaFile(URI.create(params.getTextDocument().getUri()))) return CompletableFuture.completedFuture(null);
         LOG.info("Try to rename...");
         var file = Paths.get(URI.create(params.getTextDocument().getUri()));
@@ -766,10 +796,25 @@ public class JavaLanguageServer implements IDELanguageServer, IDELanguageClientA
 	}
 
 	@Override
-	public void didSave(DidSaveTextDocumentParams params) {
+	public void didSave(@NotNull DidSaveTextDocumentParams params) {
 		if (FileStore.isJavaFile(URI.create(params.getTextDocument().getUri()))) {
             lint(FileStore.activeDocuments());
         }
+	}
+
+	@Override
+	public CompletableFuture<List<SemanticHighlight>> semanticHighlights(SemanticHighlightsParams params) {
+		return CompletableFutures.computeAsync(cancelChecker -> {
+			final var path = Paths.get(URI.create(params.getTextDocument().getUri()));
+			if (!FileStore.isJavaFile(path)) {
+				throw new ResponseErrorException(new ResponseError(ResponseErrorCode.InvalidParams, "File is not a java file", null));
+			}
+
+			try (var task = lintCompiler().compile(path)) {
+				final var highlighter = new SemanticHighlightProvider(task, cancelChecker);
+				return highlighter.highlights();
+			}
+		});
 	}
 	
 	public static final Position Position_NONE = new Position(-1, -1);

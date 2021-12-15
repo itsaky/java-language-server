@@ -40,7 +40,7 @@ import javax.tools.JavaFileObject;
 import static org.javacs.services.JavaLanguageServer.Range_NONE;
 
 class Parser {
-    private static final JavaCompiler COMPILER = ServiceLoader.load(JavaCompiler.class).iterator().next();
+    private static final JavaCompiler COMPILER = createCompiler();
     private static final SourceFileManager FILE_MANAGER = new SourceFileManager();
     /** Create a task that compiles a single file */
     private static JavacTask singleFileTask(JavaFileObject file) {
@@ -53,7 +53,11 @@ class Parser {
     final JavacTask task;
     final CompilationUnitTree root;
     final Trees trees;
-
+    
+    private static JavaCompiler createCompiler () {
+        return com.sun.tools.javac.api.JavacTool.create();
+    }
+    
     private Parser(JavaFileObject file) {
         this.file = file;
         try {

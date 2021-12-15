@@ -34,7 +34,8 @@ public class JavaCompilerService implements CompilerProvider {
     final Set<String> addExports;
     final ReusableCompiler compiler = new ReusableCompiler();
     final Docs docs;
-    final Set<String> jdkClasses = new HashSet<String>(), classPathClasses;
+    final Set<String> jdkClasses = new HashSet<String>();
+    final Set<String> classPathClasses;
     // Diagnostics from the last compilation task
     final List<Diagnostic<? extends JavaFileObject>> diags = Collections.synchronizedList(new ArrayList<>());
     // Use the same file manager for multiple tasks, so we don't repeatedly re-compile the same files
